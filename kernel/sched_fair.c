@@ -824,6 +824,26 @@ check_preempt_tick(struct cfs_rq *cfs_rq, struct sched_entity *curr)
 		 * re-elected due to buddy favours.
 		 */
 		clear_buddies(cfs_rq, curr);
+		return;
+	}
+
+	/*
+	 * Ensure that a task that missed wakeup preemption by a
+	 * narrow margin doesn't have to wait for a full slice.
+	 * This also mitigates buddy induced latencies under load.
+	 */
+	if (!sched_feat(WAKEUP_PREEMPT))
+		return;
+
+	if (delta_exec < sysctl_sched_min_granularity)
+		return;
+
+	if (cfs_rq->nr_running > 1) {
+		struct sched_entity *se = __pick_next_entity(cfs_rq);
+		s64 delta = curr->vruntime - se->vruntime;
+
+		if (delta > ideal_runtime)
+			resched_task(rq_of(cfs_rq)->curr);
 	}
 }
 
@@ -863,12 +883,27 @@ wakeup_preempt_entity(struct sched_entity *curr, struct sched_entity *se);
 static struct sched_entity *pick_next_entity(struct cfs_rq *cfs_rq)
 {
 	struct sched_entity *se = __pick_next_entity(cfs_rq);
+<<<<<<< HEAD
 
 	if (cfs_rq->next && wakeup_preempt_entity(cfs_rq->next, se) < 1)
 		return cfs_rq->next;
 
 	if (cfs_rq->last && wakeup_preempt_entity(cfs_rq->last, se) < 1)
 		return cfs_rq->last;
+=======
+	struct sched_entity *left = se;
+
+	if (cfs_rq->next && wakeup_preempt_entity(cfs_rq->next, left) < 1)
+		se = cfs_rq->next;
+
+	/*
+	 * Prefer last buddy, try to return the CPU to a preempted task.
+	 */
+	if (cfs_rq->last && wakeup_preempt_entity(cfs_rq->last, left) < 1)
+		se = cfs_rq->last;
+
+	clear_buddies(cfs_rq, se);
+>>>>>>> f685cea... sched: Strengthen buddies and mitigate buddy induced latencies
 
 	return se;
 }
@@ -1572,7 +1607,12 @@ static void check_preempt_wakeup(struct rq *rq, struct task_struct *p, int flags
 	struct task_struct *curr = rq->curr;
 	struct sched_entity *se = &curr->se, *pse = &p->se;
 	struct cfs_rq *cfs_rq = task_cfs_rq(curr);
+<<<<<<< HEAD
 	int sync = flags & WF_SYNC;
+=======
+	int sync = wake_flags & WF_SYNC;
+	int scale = cfs_rq->nr_running >= sched_nr_latency;
+>>>>>>> f685cea... sched: Strengthen buddies and mitigate buddy induced latencies
 
 	update_curr(cfs_rq);
 
@@ -1587,6 +1627,7 @@ static void check_preempt_wakeup(struct rq *rq, struct task_struct *p, int flags
 	if (unlikely(se == pse))
 		return;
 
+<<<<<<< HEAD
 	/*
 	 * Only set the backward buddy when the current task is still on the
 	 * rq. This can happen when a wakeup gets interleaved with schedule on
@@ -1599,6 +1640,9 @@ static void check_preempt_wakeup(struct rq *rq, struct task_struct *p, int flags
 	if (sched_feat(LAST_BUDDY) && likely(se->on_rq && curr != rq->idle))
 		set_last_buddy(se);
 	if (sched_feat(NEXT_BUDDY) && !(flags & WF_FORK))
+=======
+	if (sched_feat(NEXT_BUDDY) && scale && !(wake_flags & WF_FORK))
+>>>>>>> f685cea... sched: Strengthen buddies and mitigate buddy induced latencies
 		set_next_buddy(pse);
 
 	/*
@@ -1636,8 +1680,22 @@ static void check_preempt_wakeup(struct rq *rq, struct task_struct *p, int flags
 
 	BUG_ON(!pse);
 
-	if (wakeup_preempt_entity(se, pse) == 1)
+	if (wakeup_preempt_entity(se, pse) == 1) {
 		resched_task(curr);
+		/*
+		 * Only set the backward buddy when the current task is still
+		 * on the rq. This can happen when a wakeup gets interleaved
+		 * with schedule on the ->pre_schedule() or idle_balance()
+		 * point, either of which can * drop the rq lock.
+		 *
+		 * Also, during early boot the idle thread is in the fair class,
+		 * for obvious reasons its a bad idea to schedule back to it.
+		 */
+		if (unlikely(!se->on_rq || curr == rq->idle))
+			return;
+		if (sched_feat(LAST_BUDDY) && scale && entity_is_task(se))
+			set_last_buddy(se);
+	}
 }
 
 static struct task_struct *pick_next_task_fair(struct rq *rq)
