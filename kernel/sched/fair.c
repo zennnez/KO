@@ -79,8 +79,8 @@ enum sched_tunable_scaling sysctl_sched_tunable_scaling
 unsigned int sysctl_sched_min_granularity		= 300000ULL;
 unsigned int normalized_sysctl_sched_min_granularity	= 300000ULL;
 #else
-unsigned int sysctl_sched_min_granularity		= 750000ULL;
-unsigned int normalized_sysctl_sched_min_granularity	= 750000ULL;
+unsigned int sysctl_sched_min_granularity		= 500000ULL;
+unsigned int normalized_sysctl_sched_min_granularity	= 500000ULL;
 #endif
 
 /*
@@ -89,7 +89,7 @@ unsigned int normalized_sysctl_sched_min_granularity	= 750000ULL;
 #ifdef CONFIG_ZEN_INTERACTIVE
 static unsigned int sched_nr_latency = 10;
 #else
-static unsigned int sched_nr_latency = 8;
+static unsigned int sched_nr_latency = 6;
 #endif
 
 /*
@@ -139,7 +139,7 @@ unsigned int __read_mostly sysctl_sched_shares_window = 10000000UL;
 #ifdef CONFIG_ZEN_INTERACTIVE
 unsigned int sysctl_sched_cfs_bandwidth_slice		= 3000UL;
 #else
-unsigned int sysctl_sched_cfs_bandwidth_slice		= 5000UL;
+unsigned int sysctl_sched_cfs_bandwidth_slice		= 4000UL;
 #endif
 #endif
 
