@@ -101,3 +101,4 @@ obj-$(CONFIG_TOUCHSCREEN_ST)		+= st/
 #Huaqin modify for ZQL1650-137 by zhengwu.lu at 2018/01/22 start
 obj-$(CONFIG_TOUCHSCREEN_NT36xxx)	+= NVT_Touch/
 #Huaqin modify for ZQL1650-137 by zhengwu.lu at 2018/01/22 end
+obj-$(CONFIG_SWEEP2SLEEP)		+= sweep2sleep.o
