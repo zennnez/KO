@@ -1229,4 +1229,10 @@ source "drivers/input/touchscreen/NVT_Touch/Kconfig"
 #Huaqin modify for ZQL1650-137 by zhengwu.lu at 2018/01/22 end
 source "drivers/input/touchscreen/focaltech_touch/Kconfig"
 
+config SWEEP2SLEEP
+        tristate "Sweep to put device to sleep"
+        default y
+        help
+          Say Y here to support sweep2sleep
+
 endif
