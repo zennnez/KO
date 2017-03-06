@@ -454,6 +454,8 @@ int smblib_get_prop_batt_temp(struct smb_charger *chg,
 				union power_supply_propval *val);
 int smblib_get_prop_batt_charge_counter(struct smb_charger *chg,
 				union power_supply_propval *val);
+int smblib_get_prop_batt_charge_full(struct smb_charger *chg,
+				union power_supply_propval *val);
 int smblib_set_prop_input_suspend(struct smb_charger *chg,
 				const union power_supply_propval *val);
 /* Huaqin add for ZQL1650-189 by diganyun at 2018/02/01 start */

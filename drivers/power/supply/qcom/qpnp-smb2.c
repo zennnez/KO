@@ -976,6 +976,8 @@ static enum power_supply_property smb2_batt_props[] = {
 /* Huaqin add for ZQL1650-189 by diganyun at 2018/02/01 start */
 	POWER_SUPPLY_PROP_CHARGING_ENABLED,
 /* Huaqin add for ZQL1650-189 by diganyun at 2018/02/01 end */
+	POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN,
+	POWER_SUPPLY_PROP_CHARGE_FULL,
 };
 
 static int smb2_batt_get_prop(struct power_supply *psy,
@@ -1088,6 +1090,9 @@ static int smb2_batt_get_prop(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_CHARGE_COUNTER:
 		rc = smblib_get_prop_batt_charge_counter(chg, val);
+		break;
+	case POWER_SUPPLY_PROP_CHARGE_FULL:
+		rc = smblib_get_prop_batt_charge_full(chg, val);
 		break;
 	default:
 		pr_err("batt power supply prop %d not supported\n", psp);
