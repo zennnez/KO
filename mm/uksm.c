@@ -69,6 +69,7 @@
 #include <linux/gcd.h>
 #include <linux/freezer.h>
 #include <linux/sradix-tree.h>
+#include <linux/show_mem_notifier.h>
 
 #include <asm/tlbflush.h>
 #include "internal.h"
@@ -5507,6 +5508,20 @@ static inline int init_random_sampling(void)
 	return cal_positive_negative_costs();
 }
 
+static int ksm_show_mem_notifier(struct notifier_block *nb,
+				unsigned long action,
+				void *data)
+{
+	pr_info("uksm_pages_sharing: %lu\n", uksm_pages_sharing);
+	pr_info("uksm_pages_shared: %lu\n", uksm_pages_shared);
+
+	return 0;
+}
+
+static struct notifier_block ksm_show_mem_notifier_block = {
+	.notifier_call = ksm_show_mem_notifier,
+};
+
 static int __init uksm_slab_init(void)
 {
 	rmap_item_cache = UKSM_KMEM_CACHE(rmap_item, 0);
@@ -5663,6 +5678,8 @@ static int __init uksm_init(void)
 	 */
 	hotplug_memory_notifier(uksm_memory_callback, 100);
 #endif
+
+show_mem_notifier_register(&ksm_show_mem_notifier_block);
 	return 0;
 
 out_free:
