@@ -6144,6 +6144,65 @@ find_idlest_cpu(struct sched_group *group, struct task_struct *p, int this_cpu)
 	}
 
 	return shallowest_idle_cpu != -1 ? shallowest_idle_cpu : least_loaded_cpu;
+ }
+
+static inline int find_idlest_cpu(struct sched_domain *sd, struct task_struct *p,
+				  int cpu, int prev_cpu, int sd_flag)
+{
+	int new_cpu = prev_cpu;
+	int wu = sd_flag & SD_BALANCE_WAKE;
+	int cas_cpu = -1;
+
+	if (wu) {
+		schedstat_inc(p, se.statistics.nr_wakeups_cas_attempts);
+		schedstat_inc(this_rq(), eas_stats.cas_attempts);
+	}
+
+	while (sd) {
+		struct sched_group *group;
+		struct sched_domain *tmp;
+		int weight;
+
+		if (wu)
+			schedstat_inc(sd, eas_stats.cas_attempts);
+
+		if (!(sd->flags & sd_flag)) {
+			sd = sd->child;
+			continue;
+		}
+
+		group = find_idlest_group(sd, p, cpu, sd_flag);
+		if (!group) {
+			sd = sd->child;
+			continue;
+		}
+
+		new_cpu = find_idlest_group_cpu(group, p, cpu);
+		if (new_cpu == -1 || new_cpu == cpu) {
+			/* Now try balancing at a lower domain level of cpu */
+			sd = sd->child;
+			continue;
+		}
+
+		/* Now try balancing at a lower domain level of new_cpu */
+		cpu = cas_cpu = new_cpu;
+		weight = sd->span_weight;
+		sd = NULL;
+		for_each_domain(cpu, tmp) {
+			if (weight <= tmp->span_weight)
+				break;
+			if (tmp->flags & sd_flag)
+				sd = tmp;
+		}
+		/* while loop will break here if sd == NULL */
+	}
+
+	if (wu && (cas_cpu >= 0)) {
+		schedstat_inc(p, se.statistics.nr_wakeups_cas_count);
+		schedstat_inc(this_rq(), eas_stats.cas_count);
+	}
+
+	return new_cpu;
 }
 
 /*
