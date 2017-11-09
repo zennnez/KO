@@ -35,7 +35,7 @@ void sendnlmsg(char *message)
 		pr_err("alloc_skb error\n");
 		return;
 	}
-	slen = strlen(message);
+	slen = DSTRLEN(message);
 	nlh = nlmsg_put(skb_1,0,0,0,MAX_MSGSIZE,0);
 
 	NETLINK_CB(skb_1).portid = 0;
