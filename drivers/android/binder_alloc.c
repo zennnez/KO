@@ -800,3 +800,14 @@ void binder_alloc_init(struct binder_alloc *alloc)
 	mutex_init(&alloc->mutex);
 }
 
+int binder_alloc_shrinker_init(void)
+{
+	int ret = list_lru_init(&binder_alloc_lru);
+
+	if (ret == 0) {
+		ret = register_shrinker(&binder_shrinker);
+		if (ret)
+			list_lru_destroy(&binder_alloc_lru);
+	}
+	return ret;
+}
