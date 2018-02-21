@@ -75,11 +75,11 @@ static ssize_t sdcardfs_write(struct file *file, const char __user *buf,
 	/* update our inode times+sizes upon a successful lower write */
 	if (err >= 0) {
 		if (sizeof(loff_t) > sizeof(long))
-			mutex_lock(&inode->i_mutex);
+			inode_lock(inode);
 		fsstack_copy_inode_size(inode, file_inode(lower_file));
 		fsstack_copy_attr_times(inode, file_inode(lower_file));
 		if (sizeof(loff_t) > sizeof(long))
-			mutex_unlock(&inode->i_mutex);
+			inode_unlock(inode);
 	}
 
 	return err;
@@ -410,11 +410,11 @@ ssize_t sdcardfs_write_iter(struct kiocb *iocb, struct iov_iter *iter)
 	/* update upper inode times/sizes as needed */
 	if (err >= 0 || err == -EIOCBQUEUED) {
 		if (sizeof(loff_t) > sizeof(long))
-			mutex_lock(&inode->i_mutex);
+			inode_lock(inode);
 		fsstack_copy_inode_size(inode, file_inode(lower_file));
 		fsstack_copy_attr_times(inode, file_inode(lower_file));
 		if (sizeof(loff_t) > sizeof(long))
-			mutex_unlock(&inode->i_mutex);
+			inode_lock(inode);
 	}
 out:
 	return err;
