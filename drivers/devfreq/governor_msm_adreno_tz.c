@@ -387,7 +387,7 @@ extern int simple_gpu_algorithm(int level, int *val,
 
 #if 1
 static int adrenoboost_debug(struct devfreq *devfreq, unsigned long *freq,
-				u32 *flag, int jump_dir);
+				int jump_dir);
 /*
 * mapping gpu level calculated linear conservation half curve
 * values into a bell curve of conservation (lower is higher freq level)
@@ -558,7 +558,7 @@ static int tz_get_target_freq(struct devfreq *devfreq, unsigned long *freq,
 		level += val;
 		level = max(level, 0);
 		level = min_t(int, level, devfreq->profile->max_state - 1);
-		adrenoboost_debug(devfreq, freq, flag, 0);
+		adrenoboost_debug(devfreq, freq, 0);
 		priv->bin.last_level = level;
 	} else {
 		if (val) {
@@ -571,7 +571,7 @@ static int tz_get_target_freq(struct devfreq *devfreq, unsigned long *freq,
 			*/
 			if (val<0 && priv->bin.cycles_keeping_level <
 				conservation_map_up[ last_level ]) {
-				adrenoboost_debug(devfreq, freq, flag, 1);
+				adrenoboost_debug(devfreq, freq, 1);
 			} else
 			/*
 			* going downwards in frequency let it happen hard in
@@ -579,7 +579,7 @@ static int tz_get_target_freq(struct devfreq *devfreq, unsigned long *freq,
 			*/
 			if (val>0 && priv->bin.cycles_keeping_level <
 				conservation_map_down[ last_level ])  {
-				adrenoboost_debug(devfreq, freq, flag, 2);
+				adrenoboost_debug(devfreq, freq, 2);
 			} else
 			{
 				level += val;
@@ -589,7 +589,7 @@ static int tz_get_target_freq(struct devfreq *devfreq, unsigned long *freq,
 				priv->bin.cycles_keeping_level = 0;
 				// set new last level
 				priv->bin.last_level = level;
-				adrenoboost_debug(devfreq, freq, flag, 0);
+				adrenoboost_debug(devfreq, freq, 0);
 			}
 		}
 	}
@@ -609,7 +609,7 @@ static int tz_get_target_freq(struct devfreq *devfreq, unsigned long *freq,
 
 #if 1
 static int adrenoboost_debug(struct devfreq *devfreq, unsigned long *freq,
-				u32 *flag, int jump_dir)
+						int jump_dir)
 {
 	struct devfreq_msm_adreno_tz_data *priv = devfreq->data;
 	struct devfreq_dev_status stats;
