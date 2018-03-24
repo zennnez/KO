@@ -1239,30 +1239,14 @@ void set_cpus_allowed_common(struct task_struct *p, const struct cpumask *new_ma
 	p->nr_cpus_allowed = cpumask_weight(new_mask);
 }
 
-static bool is_perf_crit_kthread(const char *name)
-{
-	static const char *const perf_crit_kthreads[] = {
-		"mdss_fb0",
-		"mdss_dsi_event"
-	};
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(perf_crit_kthreads); i++) {
-		if (!strcmp(name, perf_crit_kthreads[i]))
-			return true;
-	}
-
-	return false;
-}
-
 static void get_adjusted_cpumask(const struct task_struct *p,
 	struct cpumask *new_mask, const struct cpumask *old_mask)
 {
-	static const unsigned long big_cluster_cpus = 0xf0;
+	static const unsigned long little_cluster_cpus = 0xf;
 
-	/* Force all performance-critical kthreads onto the big cluster */
-	if (p->flags & PF_KTHREAD && is_perf_crit_kthread(p->comm))
-		cpumask_copy(new_mask, to_cpumask(&big_cluster_cpus));
+	/* Force all unbound kthreads onto the little cluster */
+	if (p->flags & PF_KTHREAD && cpumask_weight(old_mask) > 1)
+		cpumask_copy(new_mask, to_cpumask(&little_cluster_cpus));
 	else
 		cpumask_copy(new_mask, old_mask);
 }
