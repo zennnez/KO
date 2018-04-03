@@ -623,6 +623,37 @@ int f2fs_getattr(struct vfsmount *mnt,
 			 struct dentry *dentry, struct kstat *stat)
 {
 	struct inode *inode = d_inode(dentry);
+#if 0
+	struct f2fs_inode_info *fi = F2FS_I(inode);
+	struct f2fs_inode *ri;
+	unsigned int flags;
+
+	if (f2fs_has_extra_attr(inode) &&
+			f2fs_sb_has_inode_crtime(inode->i_sb) &&
+			F2FS_FITS_IN_INODE(ri, fi->i_extra_isize, i_crtime)) {
+		stat->result_mask |= STATX_BTIME;
+		stat->btime.tv_sec = fi->i_crtime.tv_sec;
+		stat->btime.tv_nsec = fi->i_crtime.tv_nsec;
+	}
+
+	flags = fi->i_flags & (F2FS_FL_USER_VISIBLE | F2FS_PROJINHERIT_FL);
+	if (flags & F2FS_APPEND_FL)
+		stat->attributes |= STATX_ATTR_APPEND;
+	if (flags & F2FS_COMPR_FL)
+		stat->attributes |= STATX_ATTR_COMPRESSED;
+	if (f2fs_encrypted_inode(inode))
+		stat->attributes |= STATX_ATTR_ENCRYPTED;
+	if (flags & F2FS_IMMUTABLE_FL)
+		stat->attributes |= STATX_ATTR_IMMUTABLE;
+	if (flags & F2FS_NODUMP_FL)
+		stat->attributes |= STATX_ATTR_NODUMP;
+
+	stat->attributes_mask |= (STATX_ATTR_APPEND |
+				  STATX_ATTR_COMPRESSED |
+				  STATX_ATTR_ENCRYPTED |
+				  STATX_ATTR_IMMUTABLE |
+				  STATX_ATTR_NODUMP);
+#endif
 	generic_fillattr(inode, stat);
 	stat->blocks <<= 3;
 	return 0;
@@ -1285,7 +1316,8 @@ static int f2fs_ioc_getflags(struct file *filp, unsigned long arg)
 {
 	struct inode *inode = file_inode(filp);
 	struct f2fs_inode_info *fi = F2FS_I(inode);
-	unsigned int flags = fi->i_flags & FS_FL_USER_VISIBLE;
+	unsigned int flags = fi->i_flags &
+			(F2FS_FL_USER_VISIBLE | F2FS_PROJINHERIT_FL);
 	return put_user(flags, (int __user *)arg);
 }
 
@@ -1317,7 +1349,7 @@ static int f2fs_ioc_setflags(struct file *filp, unsigned long arg)
 
 	oldflags = fi->i_flags;
 
-	if ((flags ^ oldflags) & (FS_APPEND_FL | FS_IMMUTABLE_FL)) {
+	if ((flags ^ oldflags) & (F2FS_APPEND_FL | F2FS_IMMUTABLE_FL)) {
 		if (!capable(CAP_LINUX_IMMUTABLE)) {
 			mutex_unlock(&inode->i_mutex);
 			ret = -EPERM;
@@ -1325,8 +1357,8 @@ static int f2fs_ioc_setflags(struct file *filp, unsigned long arg)
 		}
 	}
 
-	flags = flags & FS_FL_USER_MODIFIABLE;
-	flags |= oldflags & ~FS_FL_USER_MODIFIABLE;
+	flags = flags & (F2FS_FL_USER_MODIFIABLE | F2FS_PROJINHERIT_FL);
+	flags |= oldflags & ~(F2FS_FL_USER_MODIFIABLE | F2FS_PROJINHERIT_FL);
 	fi->i_flags = flags;
 	mutex_unlock(&inode->i_mutex);
 

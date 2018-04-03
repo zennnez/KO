@@ -23,15 +23,15 @@ void f2fs_set_inode_flags(struct inode *inode)
 	unsigned int flags = F2FS_I(inode)->i_flags;
 	unsigned int new_fl = 0;
 
-	if (flags & FS_SYNC_FL)
+	if (flags & F2FS_SYNC_FL)
 		new_fl |= S_SYNC;
-	if (flags & FS_APPEND_FL)
+	if (flags & F2FS_APPEND_FL)
 		new_fl |= S_APPEND;
-	if (flags & FS_IMMUTABLE_FL)
+	if (flags & F2FS_IMMUTABLE_FL)
 		new_fl |= S_IMMUTABLE;
-	if (flags & FS_NOATIME_FL)
+	if (flags & F2FS_NOATIME_FL)
 		new_fl |= S_NOATIME;
-	if (flags & FS_DIRSYNC_FL)
+	if (flags & F2FS_DIRSYNC_FL)
 		new_fl |= S_DIRSYNC;
 	inode_set_flags(inode, new_fl,
 			S_SYNC|S_APPEND|S_IMMUTABLE|S_NOATIME|S_DIRSYNC);
@@ -150,7 +150,13 @@ static int do_read_inode(struct inode *inode)
 	__get_inode_rdev(inode, ri);
 
 	if (__written_first_block(ri))
-		set_inode_flag(F2FS_I(inode), FI_FIRST_BLOCK_WRITTEN);
+		set_inode_flag(inode, FI_FIRST_BLOCK_WRITTEN);
+
+	if (!need_inode_block_update(sbi, inode->i_ino))
+		fi->last_disk_size = inode->i_size;
+
+	if (fi->i_flags & F2FS_PROJINHERIT_FL)
+		set_inode_flag(inode, FI_PROJ_INHERIT);
 
 	f2fs_put_page(node_page, 1);
 

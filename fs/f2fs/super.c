@@ -832,8 +832,305 @@ restore_gc:
 		stop_gc_thread(sbi);
 	}
 restore_opts:
+#ifdef CONFIG_QUOTA
+	F2FS_OPTION(sbi).s_jquota_fmt = org_mount_opt.s_jquota_fmt;
+	for (i = 0; i < MAXQUOTAS; i++) {
+		kfree(F2FS_OPTION(sbi).s_qf_names[i]);
+		F2FS_OPTION(sbi).s_qf_names[i] = org_mount_opt.s_qf_names[i];
+	}
+#endif
 	sbi->mount_opt = org_mount_opt;
-	sbi->active_logs = active_logs;
+	sb->s_flags = old_sb_flags;
+	return err;
+}
+
+#ifdef CONFIG_QUOTA
+/* Read data from quotafile */
+static ssize_t f2fs_quota_read(struct super_block *sb, int type, char *data,
+			       size_t len, loff_t off)
+{
+	struct inode *inode = sb_dqopt(sb)->files[type];
+	struct address_space *mapping = inode->i_mapping;
+	block_t blkidx = F2FS_BYTES_TO_BLK(off);
+	int offset = off & (sb->s_blocksize - 1);
+	int tocopy;
+	size_t toread;
+	loff_t i_size = i_size_read(inode);
+	struct page *page;
+	char *kaddr;
+
+	if (off > i_size)
+		return 0;
+
+	if (off + len > i_size)
+		len = i_size - off;
+	toread = len;
+	while (toread > 0) {
+		tocopy = min_t(unsigned long, sb->s_blocksize - offset, toread);
+repeat:
+		page = read_cache_page_gfp(mapping, blkidx, GFP_NOFS);
+		if (IS_ERR(page)) {
+			if (PTR_ERR(page) == -ENOMEM) {
+				congestion_wait(BLK_RW_ASYNC, HZ/50);
+				goto repeat;
+			}
+			return PTR_ERR(page);
+		}
+
+		lock_page(page);
+
+		if (unlikely(page->mapping != mapping)) {
+			f2fs_put_page(page, 1);
+			goto repeat;
+		}
+		if (unlikely(!PageUptodate(page))) {
+			f2fs_put_page(page, 1);
+			return -EIO;
+		}
+
+		kaddr = kmap_atomic(page);
+		memcpy(data, kaddr + offset, tocopy);
+		kunmap_atomic(kaddr);
+		f2fs_put_page(page, 1);
+
+		offset = 0;
+		toread -= tocopy;
+		data += tocopy;
+		blkidx++;
+	}
+	return len;
+}
+
+/* Write to quotafile */
+static ssize_t f2fs_quota_write(struct super_block *sb, int type,
+				const char *data, size_t len, loff_t off)
+{
+	struct inode *inode = sb_dqopt(sb)->files[type];
+	struct address_space *mapping = inode->i_mapping;
+	const struct address_space_operations *a_ops = mapping->a_ops;
+	int offset = off & (sb->s_blocksize - 1);
+	size_t towrite = len;
+	struct page *page;
+	char *kaddr;
+	int err = 0;
+	int tocopy;
+
+	while (towrite > 0) {
+		tocopy = min_t(unsigned long, sb->s_blocksize - offset,
+								towrite);
+retry:
+		err = a_ops->write_begin(NULL, mapping, off, tocopy, 0,
+							&page, NULL);
+		if (unlikely(err)) {
+			if (err == -ENOMEM) {
+				congestion_wait(BLK_RW_ASYNC, HZ/50);
+				goto retry;
+			}
+			break;
+		}
+
+		kaddr = kmap_atomic(page);
+		memcpy(kaddr + offset, data, tocopy);
+		kunmap_atomic(kaddr);
+		flush_dcache_page(page);
+
+		a_ops->write_end(NULL, mapping, off, tocopy, tocopy,
+						page, NULL);
+		offset = 0;
+		towrite -= tocopy;
+		off += tocopy;
+		data += tocopy;
+		cond_resched();
+	}
+
+	if (len == towrite)
+		return err;
+	inode->i_mtime = inode->i_ctime = current_time(inode);
+	f2fs_mark_inode_dirty_sync(inode, false);
+	return len - towrite;
+}
+
+static struct dquot **f2fs_get_dquots(struct inode *inode)
+{
+	return F2FS_I(inode)->i_dquot;
+}
+
+static qsize_t *f2fs_get_reserved_space(struct inode *inode)
+{
+	return &F2FS_I(inode)->i_reserved_quota;
+}
+
+static int f2fs_quota_on_mount(struct f2fs_sb_info *sbi, int type)
+{
+	return dquot_quota_on_mount(sbi->sb, F2FS_OPTION(sbi).s_qf_names[type],
+					F2FS_OPTION(sbi).s_jquota_fmt, type);
+}
+
+int f2fs_enable_quota_files(struct f2fs_sb_info *sbi, bool rdonly)
+{
+	int enabled = 0;
+	int i, err;
+
+	if (f2fs_sb_has_quota_ino(sbi->sb) && rdonly) {
+		err = f2fs_enable_quotas(sbi->sb);
+		if (err) {
+			f2fs_msg(sbi->sb, KERN_ERR,
+					"Cannot turn on quota_ino: %d", err);
+			return 0;
+		}
+		return 1;
+	}
+
+	for (i = 0; i < MAXQUOTAS; i++) {
+		if (F2FS_OPTION(sbi).s_qf_names[i]) {
+			err = f2fs_quota_on_mount(sbi, i);
+			if (!err) {
+				enabled = 1;
+				continue;
+			}
+			f2fs_msg(sbi->sb, KERN_ERR,
+				"Cannot turn on quotas: %d on %d", err, i);
+		}
+	}
+	return enabled;
+}
+
+static int f2fs_quota_enable(struct super_block *sb, int type, int format_id,
+			     unsigned int flags)
+{
+	struct inode *qf_inode;
+	unsigned long qf_inum;
+	int err;
+
+	BUG_ON(!f2fs_sb_has_quota_ino(sb));
+
+	qf_inum = f2fs_qf_ino(sb, type);
+	if (!qf_inum)
+		return -EPERM;
+
+	qf_inode = f2fs_iget(sb, qf_inum);
+	if (IS_ERR(qf_inode)) {
+		f2fs_msg(sb, KERN_ERR,
+			"Bad quota inode %u:%lu", type, qf_inum);
+		return PTR_ERR(qf_inode);
+	}
+
+	/* Don't account quota for quota files to avoid recursion */
+	qf_inode->i_flags |= S_NOQUOTA;
+	err = dquot_enable(qf_inode, type, format_id, flags);
+	iput(qf_inode);
+	return err;
+}
+
+static int f2fs_enable_quotas(struct super_block *sb)
+{
+	int type, err = 0;
+	unsigned long qf_inum;
+	bool quota_mopt[MAXQUOTAS] = {
+		test_opt(F2FS_SB(sb), USRQUOTA),
+		test_opt(F2FS_SB(sb), GRPQUOTA),
+		test_opt(F2FS_SB(sb), PRJQUOTA),
+	};
+
+	sb_dqopt(sb)->flags |= DQUOT_QUOTA_SYS_FILE;
+	for (type = 0; type < MAXQUOTAS; type++) {
+		qf_inum = f2fs_qf_ino(sb, type);
+		if (qf_inum) {
+			err = f2fs_quota_enable(sb, type, QFMT_VFS_V1,
+				DQUOT_USAGE_ENABLED |
+				(quota_mopt[type] ? DQUOT_LIMITS_ENABLED : 0));
+			if (err) {
+				f2fs_msg(sb, KERN_ERR,
+					"Failed to enable quota tracking "
+					"(type=%d, err=%d). Please run "
+					"fsck to fix.", type, err);
+				for (type--; type >= 0; type--)
+					dquot_quota_off(sb, type);
+				return err;
+			}
+		}
+	}
+	return 0;
+}
+
+static int f2fs_quota_sync(struct super_block *sb, int type)
+{
+	struct quota_info *dqopt = sb_dqopt(sb);
+	int cnt;
+	int ret;
+
+	ret = dquot_writeback_dquots(sb, type);
+	if (ret)
+		return ret;
+
+	/*
+	 * Now when everything is written we can discard the pagecache so
+	 * that userspace sees the changes.
+	 */
+	for (cnt = 0; cnt < MAXQUOTAS; cnt++) {
+		if (type != -1 && cnt != type)
+			continue;
+		if (!sb_has_quota_active(sb, cnt))
+			continue;
+
+		ret = filemap_write_and_wait(dqopt->files[cnt]->i_mapping);
+		if (ret)
+			return ret;
+
+		inode_lock(dqopt->files[cnt]);
+		truncate_inode_pages(&dqopt->files[cnt]->i_data, 0);
+		inode_unlock(dqopt->files[cnt]);
+	}
+	return 0;
+}
+
+static int f2fs_quota_on(struct super_block *sb, int type, int format_id,
+							struct path *path)
+{
+	struct inode *inode;
+	int err;
+
+	err = f2fs_quota_sync(sb, type);
+	if (err)
+		return err;
+
+	err = dquot_quota_on(sb, type, format_id, path);
+	if (err)
+		return err;
+
+	inode = d_inode(path->dentry);
+
+	inode_lock(inode);
+	F2FS_I(inode)->i_flags |= F2FS_NOATIME_FL | F2FS_IMMUTABLE_FL;
+	inode_set_flags(inode, S_NOATIME | S_IMMUTABLE,
+					S_NOATIME | S_IMMUTABLE);
+	inode_unlock(inode);
+	f2fs_mark_inode_dirty_sync(inode, false);
+
+	return 0;
+}
+
+static int f2fs_quota_off(struct super_block *sb, int type)
+{
+	struct inode *inode = sb_dqopt(sb)->files[type];
+	int err;
+
+	if (!inode || !igrab(inode))
+		return dquot_quota_off(sb, type);
+
+	f2fs_quota_sync(sb, type);
+
+	err = dquot_quota_off(sb, type);
+	if (err || f2fs_sb_has_quota_ino(sb))
+		goto out_put;
+
+	inode_lock(inode);
+	F2FS_I(inode)->i_flags &= ~(F2FS_NOATIME_FL | F2FS_IMMUTABLE_FL);
+	inode_set_flags(inode, 0, S_NOATIME | S_IMMUTABLE);
+	inode_unlock(inode);
+	f2fs_mark_inode_dirty_sync(inode, false);
+out_put:
+	iput(inode);
 	return err;
 }
 
