@@ -404,8 +404,9 @@ static int f2fs_convert_inline_dir(struct inode *dir, struct page *ipage,
 	if (err)
 		goto out;
 
-	f2fs_wait_on_page_writeback(page, DATA);
-	zero_user_segment(page, MAX_INLINE_DATA, PAGE_CACHE_SIZE);
+	f2fs_wait_on_page_writeback(page, DATA, true);
+
+	dentry_blk = page_address(page);
 
 	dentry_blk = kmap_atomic(page);
 
