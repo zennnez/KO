@@ -1731,12 +1731,66 @@ long f2fs_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 static ssize_t f2fs_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
 {
-	struct inode *inode = file_inode(iocb->ki_filp);
+	struct file *file = iocb->ki_filp;
+	struct inode *inode = file_inode(file);
+	ssize_t ret;
 
-	if (f2fs_encrypted_inode(inode) &&
-				!f2fs_has_encryption_key(inode) &&
-				f2fs_get_encryption_info(inode))
-		return -EACCES;
+	if (unlikely(f2fs_cp_error(F2FS_I_SB(inode))))
+		return -EIO;
+
+	if ((iocb->ki_flags & IOCB_NOWAIT) && !(iocb->ki_flags & IOCB_DIRECT))
+		return -EINVAL;
+
+	if (!inode_trylock(inode)) {
+		if (iocb->ki_flags & IOCB_NOWAIT)
+			return -EAGAIN;
+		inode_lock(inode);
+	}
+
+	ret = generic_write_checks(iocb, from);
+	if (ret > 0) {
+		bool preallocated = false;
+		size_t target_size = 0;
+		int err;
+
+		if (iov_iter_fault_in_readable(from, iov_iter_count(from)))
+			set_inode_flag(inode, FI_NO_PREALLOC);
+
+		if ((iocb->ki_flags & IOCB_NOWAIT) &&
+			(iocb->ki_flags & IOCB_DIRECT)) {
+				if (!f2fs_overwrite_io(inode, iocb->ki_pos,
+						iov_iter_count(from)) ||
+					f2fs_has_inline_data(inode) ||
+					f2fs_force_buffered_io(inode, WRITE)) {
+						inode_unlock(inode);
+						return -EAGAIN;
+				}
+
+		} else {
+			preallocated = true;
+			target_size = iocb->ki_pos + iov_iter_count(from);
+
+			err = f2fs_preallocate_blocks(iocb, from);
+			if (err) {
+				clear_inode_flag(inode, FI_NO_PREALLOC);
+				inode_unlock(inode);
+				return err;
+			}
+		}
+		ret = __generic_file_write_iter(iocb, from);
+		clear_inode_flag(inode, FI_NO_PREALLOC);
+
+		/* if we couldn't write data, we should deallocate blocks. */
+		if (preallocated && i_size_read(inode) < target_size)
+			f2fs_truncate(inode);
+
+		if (ret > 0)
+			f2fs_update_iostat(F2FS_I_SB(inode), APP_WRITE_IO, ret);
+	}
+	inode_unlock(inode);
+
+	if (ret > 0) {
+		ssize_t err;
 
 	return generic_file_write_iter(iocb, from);
 }
