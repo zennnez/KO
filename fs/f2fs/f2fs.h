@@ -111,19 +111,20 @@ enum {
 	SIT_BITMAP
 };
 
-enum {
-	CP_UMOUNT,
-	CP_FASTBOOT,
-	CP_SYNC,
-	CP_RECOVERY,
-	CP_DISCARD,
-};
+#define	CP_UMOUNT	0x00000001
+#define	CP_FASTBOOT	0x00000002
+#define	CP_SYNC		0x00000004
+#define	CP_RECOVERY	0x00000008
+#define	CP_DISCARD	0x00000010
+#define CP_TRIMMED	0x00000020
 
-#define DEF_BATCHED_TRIM_SECTIONS	32
-#define BATCHED_TRIM_SEGMENTS(sbi)	\
-		(SM_I(sbi)->trim_sections * (sbi)->segs_per_sec)
-#define BATCHED_TRIM_BLOCKS(sbi)	\
-		(BATCHED_TRIM_SEGMENTS(sbi) << (sbi)->log_blocks_per_seg)
+#define MAX_DISCARD_BLOCKS(sbi)		BLKS_PER_SEC(sbi)
+#define DEF_MAX_DISCARD_REQUEST		8	/* issue 8 discards per round */
+#define DEF_MAX_DISCARD_LEN		512	/* Max. 2MB per discard */
+#define DEF_MIN_DISCARD_ISSUE_TIME	50	/* 50 ms, if exists */
+#define DEF_MID_DISCARD_ISSUE_TIME	500	/* 500 ms, if device busy */
+#define DEF_MAX_DISCARD_ISSUE_TIME	60000	/* 60 s, if no candidates */
+#define DEF_DISCARD_URGENT_UTIL		80	/* do more discard over 80% */
 #define DEF_CP_INTERVAL			60	/* 60 secs */
 
 struct cp_control {
@@ -173,8 +174,86 @@ struct inode_entry {
 /* for the list of blockaddresses to be discarded */
 struct discard_entry {
 	struct list_head list;	/* list head */
-	block_t blkaddr;	/* block address to be discarded */
-	int len;		/* # of consecutive blocks of the discard */
+	block_t start_blkaddr;	/* start blockaddr of current segment */
+	unsigned char discard_map[SIT_VBLOCK_MAP_SIZE];	/* segment discard bitmap */
+};
+
+/* default discard granularity of inner discard thread, unit: block count */
+#define DEFAULT_DISCARD_GRANULARITY		16
+
+/* max discard pend list number */
+#define MAX_PLIST_NUM		512
+#define plist_idx(blk_num)	((blk_num) >= MAX_PLIST_NUM ?		\
+					(MAX_PLIST_NUM - 1) : (blk_num - 1))
+
+enum {
+	D_PREP,
+	D_SUBMIT,
+	D_DONE,
+};
+
+struct discard_info {
+	block_t lstart;			/* logical start address */
+	block_t len;			/* length */
+	block_t start;			/* actual start address in dev */
+};
+
+struct discard_cmd {
+	struct rb_node rb_node;		/* rb node located in rb-tree */
+	union {
+		struct {
+			block_t lstart;	/* logical start address */
+			block_t len;	/* length */
+			block_t start;	/* actual start address in dev */
+		};
+		struct discard_info di;	/* discard info */
+
+	};
+	struct list_head list;		/* command list */
+	struct completion wait;		/* compleation */
+	struct block_device *bdev;	/* bdev */
+	unsigned short ref;		/* reference count */
+	unsigned char state;		/* state */
+	int error;			/* bio error */
+};
+
+enum {
+	DPOLICY_BG,
+	DPOLICY_FORCE,
+	DPOLICY_FSTRIM,
+	DPOLICY_UMOUNT,
+	MAX_DPOLICY,
+};
+
+struct discard_policy {
+	int type;			/* type of discard */
+	unsigned int min_interval;	/* used for candidates exist */
+	unsigned int mid_interval;	/* used for device busy */
+	unsigned int max_interval;	/* used for candidates not exist */
+	unsigned int max_requests;	/* # of discards issued per round */
+	unsigned int io_aware_gran;	/* minimum granularity discard not be aware of I/O */
+	bool io_aware;			/* issue discard in idle time */
+	bool sync;			/* submit discard with REQ_SYNC flag */
+	unsigned int granularity;	/* discard granularity */
+};
+
+struct discard_cmd_control {
+	struct task_struct *f2fs_issue_discard;	/* discard thread */
+	struct list_head entry_list;		/* 4KB discard entry list */
+	struct list_head pend_list[MAX_PLIST_NUM];/* store pending entries */
+	struct list_head wait_list;		/* store on-flushing entries */
+	struct list_head fstrim_list;		/* in-flight discard from fstrim */
+	wait_queue_head_t discard_wait_queue;	/* waiting queue for wake-up */
+	unsigned int discard_wake;		/* to wake up discard thread */
+	struct mutex cmd_lock;
+	unsigned int nr_discards;		/* # of discards in the list */
+	unsigned int max_discards;		/* max. discards to be issued */
+	unsigned int discard_granularity;	/* discard granularity */
+	unsigned int undiscard_blks;		/* # of undiscard blocks */
+	atomic_t issued_discard;		/* # of issued discard */
+	atomic_t issing_discard;		/* # of issing discard */
+	atomic_t discard_cmd_cnt;		/* # of cached cmd count */
+	struct rb_root root;			/* root of discard rb-tree */
 };
 
 /* for the list of fsync inodes, used only during recovery */
