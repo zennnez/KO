@@ -870,6 +870,9 @@ static void __submit_discard_cmd(struct f2fs_sb_info *sbi,
 	if (dc->state != D_PREP)
 		return;
 
+	if (is_sbi_flag_set(sbi, SBI_NEED_FSCK))
+		return;
+
 	trace_f2fs_issue_discard(dc->bdev, dc->start, dc->len);
 
 	dc->error = __blkdev_issue_discard(dc->bdev,
@@ -1268,7 +1271,51 @@ void stop_discard_thread(struct f2fs_sb_info *sbi)
 
 bool discard_next_dnode(struct f2fs_sb_info *sbi, block_t blkaddr)
 {
-	int err = -ENOTSUPP;
+	struct f2fs_sb_info *sbi = data;
+	struct discard_cmd_control *dcc = SM_I(sbi)->dcc_info;
+	wait_queue_head_t *q = &dcc->discard_wait_queue;
+	struct discard_policy dpolicy;
+	unsigned int wait_ms = DEF_MIN_DISCARD_ISSUE_TIME;
+	int issued;
+
+	set_freezable();
+
+	do {
+		__init_discard_policy(sbi, &dpolicy, DPOLICY_BG,
+					dcc->discard_granularity);
+
+		wait_event_interruptible_timeout(*q,
+				kthread_should_stop() || freezing(current) ||
+				dcc->discard_wake,
+				msecs_to_jiffies(wait_ms));
+		if (try_to_freeze())
+			continue;
+		if (f2fs_readonly(sbi->sb))
+			continue;
+		if (kthread_should_stop())
+			return 0;
+		if (is_sbi_flag_set(sbi, SBI_NEED_FSCK)) {
+			wait_ms = dpolicy.max_interval;
+			continue;
+		}
+
+		if (dcc->discard_wake)
+			dcc->discard_wake = 0;
+
+		if (sbi->gc_thread && sbi->gc_thread->gc_urgent)
+			__init_discard_policy(sbi, &dpolicy, DPOLICY_FORCE, 1);
+
+		sb_start_intwrite(sbi->sb);
+
+		issued = __issue_discard_cmd(sbi, &dpolicy);
+		if (issued) {
+			__wait_all_discard_cmd(sbi, &dpolicy);
+			wait_ms = dpolicy.min_interval;
+		} else {
+			wait_ms = dpolicy.max_interval;
+		}
+
+		sb_end_intwrite(sbi->sb);
 
 	if (test_opt(sbi, DISCARD)) {
 		struct seg_entry *se = get_seg_entry(sbi,
