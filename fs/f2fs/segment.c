@@ -211,7 +211,136 @@ void register_inmem_page(struct inode *inode, struct page *page)
 	trace_f2fs_register_inmem_page(page, INMEM);
 }
 
-int commit_inmem_pages(struct inode *inode, bool abort)
+static int __revoke_inmem_pages(struct inode *inode,
+				struct list_head *head, bool drop, bool recover)
+{
+	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
+	struct inmem_pages *cur, *tmp;
+	int err = 0;
+
+	list_for_each_entry_safe(cur, tmp, head, list) {
+		struct page *page = cur->page;
+
+		if (drop)
+			trace_f2fs_commit_inmem_page(page, INMEM_DROP);
+
+		lock_page(page);
+
+		if (recover) {
+			struct dnode_of_data dn;
+			struct node_info ni;
+
+			trace_f2fs_commit_inmem_page(page, INMEM_REVOKE);
+retry:
+			set_new_dnode(&dn, inode, NULL, NULL, 0);
+			err = get_dnode_of_data(&dn, page->index, LOOKUP_NODE);
+			if (err) {
+				if (err == -ENOMEM) {
+					congestion_wait(BLK_RW_ASYNC, HZ/50);
+					cond_resched();
+					goto retry;
+				}
+				err = -EAGAIN;
+				goto next;
+			}
+			get_node_info(sbi, dn.nid, &ni);
+			if (cur->old_addr == NEW_ADDR) {
+				invalidate_blocks(sbi, dn.data_blkaddr);
+				f2fs_update_data_blkaddr(&dn, NEW_ADDR);
+			} else
+				f2fs_replace_block(sbi, &dn, dn.data_blkaddr,
+					cur->old_addr, ni.version, true, true);
+			f2fs_put_dnode(&dn);
+		}
+next:
+		/* we don't need to invalidate this in the sccessful status */
+		if (drop || recover)
+			ClearPageUptodate(page);
+		set_page_private(page, 0);
+		ClearPagePrivate(page);
+		f2fs_put_page(page, 1);
+
+		list_del(&cur->list);
+		kmem_cache_free(inmem_entry_slab, cur);
+		dec_page_count(F2FS_I_SB(inode), F2FS_INMEM_PAGES);
+	}
+	return err;
+}
+
+void drop_inmem_pages_all(struct f2fs_sb_info *sbi)
+{
+	struct list_head *head = &sbi->inode_list[ATOMIC_FILE];
+	struct inode *inode;
+	struct f2fs_inode_info *fi;
+next:
+	spin_lock(&sbi->inode_lock[ATOMIC_FILE]);
+	if (list_empty(head)) {
+		spin_unlock(&sbi->inode_lock[ATOMIC_FILE]);
+		return;
+	}
+	fi = list_first_entry(head, struct f2fs_inode_info, inmem_ilist);
+	inode = igrab(&fi->vfs_inode);
+	spin_unlock(&sbi->inode_lock[ATOMIC_FILE]);
+
+	if (inode) {
+		drop_inmem_pages(inode);
+		iput(inode);
+	}
+	congestion_wait(BLK_RW_ASYNC, HZ/50);
+	cond_resched();
+	goto next;
+}
+
+void drop_inmem_pages(struct inode *inode)
+{
+	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
+	struct f2fs_inode_info *fi = F2FS_I(inode);
+
+	mutex_lock(&fi->inmem_lock);
+	__revoke_inmem_pages(inode, &fi->inmem_pages, true, false);
+	spin_lock(&sbi->inode_lock[ATOMIC_FILE]);
+	if (!list_empty(&fi->inmem_ilist))
+		list_del_init(&fi->inmem_ilist);
+	spin_unlock(&sbi->inode_lock[ATOMIC_FILE]);
+	mutex_unlock(&fi->inmem_lock);
+
+	clear_inode_flag(inode, FI_ATOMIC_FILE);
+	clear_inode_flag(inode, FI_HOT_DATA);
+	stat_dec_atomic_write(inode);
+}
+
+void drop_inmem_page(struct inode *inode, struct page *page)
+{
+	struct f2fs_inode_info *fi = F2FS_I(inode);
+	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
+	struct list_head *head = &fi->inmem_pages;
+	struct inmem_pages *cur = NULL;
+
+	f2fs_bug_on(sbi, !IS_ATOMIC_WRITTEN_PAGE(page));
+
+	mutex_lock(&fi->inmem_lock);
+	list_for_each_entry(cur, head, list) {
+		if (cur->page == page)
+			break;
+	}
+
+	f2fs_bug_on(sbi, list_empty(head) || cur->page != page);
+	list_del(&cur->list);
+	mutex_unlock(&fi->inmem_lock);
+
+	dec_page_count(sbi, F2FS_INMEM_PAGES);
+	kmem_cache_free(inmem_entry_slab, cur);
+
+	ClearPageUptodate(page);
+	set_page_private(page, 0);
+	ClearPagePrivate(page);
+	f2fs_put_page(page, 0);
+
+	trace_f2fs_commit_inmem_page(page, INMEM_INVALIDATE);
+}
+
+static int __commit_inmem_pages(struct inode *inode,
+					struct list_head *revoke_list)
 {
 	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
 	struct f2fs_inode_info *fi = F2FS_I(inode);
