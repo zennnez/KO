@@ -1394,6 +1394,8 @@ static int f2fs_ioc_start_atomic_write(struct file *filp)
 
 	f2fs_balance_fs(F2FS_I_SB(inode));
 
+	down_write(&F2FS_I(inode)->dio_rwsem[WRITE]);
+
 	if (f2fs_is_atomic_file(inode))
 		return 0;
 
@@ -1401,8 +1403,15 @@ static int f2fs_ioc_start_atomic_write(struct file *filp)
 	if (ret)
 		return ret;
 
-	set_inode_flag(F2FS_I(inode), FI_ATOMIC_FILE);
-	return 0;
+inc_stat:
+	F2FS_I(inode)->inmem_task = current;
+	stat_inc_atomic_write(inode);
+	stat_update_max_atomic_write(inode);
+out:
+	up_write(&F2FS_I(inode)->dio_rwsem[WRITE]);
+	inode_unlock(inode);
+	mnt_drop_write_file(filp);
+	return ret;
 }
 
 static int f2fs_ioc_commit_atomic_write(struct file *filp)
