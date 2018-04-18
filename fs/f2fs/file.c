@@ -1401,9 +1401,22 @@ static int f2fs_ioc_start_atomic_write(struct file *filp)
 
 	ret = f2fs_convert_inline_inode(inode);
 	if (ret)
-		return ret;
+		goto out;
 
-inc_stat:
+	if (!get_dirty_pages(inode))
+		goto skip_flush;
+
+	f2fs_msg(F2FS_I_SB(inode)->sb, KERN_WARNING,
+		"Unexpected flush for atomic writes: ino=%lu, npages=%u",
+					inode->i_ino, get_dirty_pages(inode));
+	ret = filemap_write_and_wait_range(inode->i_mapping, 0, LLONG_MAX);
+	if (ret)
+		goto out;
+skip_flush:
+	set_inode_flag(inode, FI_HOT_DATA);
+	set_inode_flag(inode, FI_ATOMIC_FILE);
+	f2fs_update_time(F2FS_I_SB(inode), REQ_TIME);
+
 	F2FS_I(inode)->inmem_task = current;
 	stat_inc_atomic_write(inode);
 	stat_update_max_atomic_write(inode);
