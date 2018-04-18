@@ -1442,6 +1442,15 @@ static int f2fs_ioc_commit_atomic_write(struct file *filp)
 	if (ret)
 		return ret;
 
+	inode_lock(inode);
+
+	down_write(&F2FS_I(inode)->dio_rwsem[WRITE]);
+
+	if (f2fs_is_volatile_file(inode)) {
+		ret = -EINVAL;
+		goto err_out;
+	}
+
 	if (f2fs_is_atomic_file(inode)) {
 		clear_inode_flag(F2FS_I(inode), FI_ATOMIC_FILE);
 		ret = commit_inmem_pages(inode, false);
