@@ -339,8 +339,7 @@ void drop_inmem_page(struct inode *inode, struct page *page)
 	trace_f2fs_commit_inmem_page(page, INMEM_INVALIDATE);
 }
 
-static int __commit_inmem_pages(struct inode *inode,
-					struct list_head *revoke_list)
+static int __commit_inmem_pages(struct inode *inode)
 {
 	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
 	struct f2fs_inode_info *fi = F2FS_I(inode);
@@ -352,19 +351,18 @@ static int __commit_inmem_pages(struct inode *inode,
 		.rw = WRITE_SYNC | REQ_PRIO,
 		.encrypted_page = NULL,
 	};
+	struct list_head revoke_list;
+	pgoff_t last_idx = ULONG_MAX;
 	int err = 0;
 
-	/*
-	 * The abort is true only when f2fs_evict_inode is called.
-	 * Basically, the f2fs_evict_inode doesn't produce any data writes, so
-	 * that we don't need to call f2fs_balance_fs.
-	 * Otherwise, f2fs_gc in f2fs_balance_fs can wait forever until this
-	 * inode becomes free by iget_locked in f2fs_iget.
-	 */
-	if (!abort) {
-		f2fs_balance_fs(sbi);
-		f2fs_lock_op(sbi);
-	}
+	INIT_LIST_HEAD(&revoke_list);
+
+	list_for_each_entry_safe(cur, tmp, &fi->inmem_pages, list) {
+		struct page *page = cur->page;
+
+		lock_page(page);
+		if (page->mapping == inode->i_mapping) {
+			trace_f2fs_commit_inmem_page(page, INMEM);
 
 	mutex_lock(&fi->inmem_lock);
 	list_for_each_entry_safe(cur, tmp, &fi->inmem_pages, list) {
@@ -388,14 +386,51 @@ static int __commit_inmem_pages(struct inode *inode,
 		} else {
 			trace_f2fs_commit_inmem_page(cur->page, INMEM_DROP);
 		}
-		set_page_private(cur->page, 0);
-		ClearPagePrivate(cur->page);
-		f2fs_put_page(cur->page, 1);
-
-		list_del(&cur->list);
-		kmem_cache_free(inmem_entry_slab, cur);
-		dec_page_count(F2FS_I_SB(inode), F2FS_INMEM_PAGES);
+		unlock_page(page);
+		list_move_tail(&cur->list, &revoke_list);
 	}
+
+	if (last_idx != ULONG_MAX)
+		f2fs_submit_merged_write_cond(sbi, inode, 0, last_idx, DATA);
+
+	if (err) {
+		/*
+		 * try to revoke all committed pages, but still we could fail
+		 * due to no memory or other reason, if that happened, EAGAIN
+		 * will be returned, which means in such case, transaction is
+		 * already not integrity, caller should use journal to do the
+		 * recovery or rewrite & commit last transaction. For other
+		 * error number, revoking was done by filesystem itself.
+		 */
+		err = __revoke_inmem_pages(inode, &revoke_list, false, true);
+
+		/* drop all uncommitted pages */
+		__revoke_inmem_pages(inode, &fi->inmem_pages, true, false);
+	} else {
+		__revoke_inmem_pages(inode, &revoke_list, false, false);
+	}
+
+	return err;
+}
+
+int commit_inmem_pages(struct inode *inode)
+{
+	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
+	struct f2fs_inode_info *fi = F2FS_I(inode);
+	int err;
+
+	f2fs_balance_fs(sbi, true);
+	f2fs_lock_op(sbi);
+
+	set_inode_flag(inode, FI_ATOMIC_COMMIT);
+
+	mutex_lock(&fi->inmem_lock);
+	err = __commit_inmem_pages(inode);
+
+	spin_lock(&sbi->inode_lock[ATOMIC_FILE]);
+	if (!list_empty(&fi->inmem_ilist))
+		list_del_init(&fi->inmem_ilist);
+	spin_unlock(&sbi->inode_lock[ATOMIC_FILE]);
 	mutex_unlock(&fi->inmem_lock);
 
 	if (!abort) {
