@@ -145,6 +145,18 @@ out:
 	return err;
 }
 
+static void recover_inline_flags(struct inode *inode, struct f2fs_inode *ri)
+{
+	if (ri->i_inline & F2FS_PIN_FILE)
+		set_inode_flag(inode, FI_PIN_FILE);
+	else
+		clear_inode_flag(inode, FI_PIN_FILE);
+	if (ri->i_inline & F2FS_DATA_EXIST)
+		set_inode_flag(inode, FI_DATA_EXIST);
+	else
+		clear_inode_flag(inode, FI_DATA_EXIST);
+}
+
 static void recover_inode(struct inode *inode, struct page *page)
 {
 	struct f2fs_inode *raw = F2FS_INODE(page);
