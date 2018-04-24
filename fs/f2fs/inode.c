@@ -173,12 +173,8 @@ static int do_read_inode(struct inode *inode)
 	struct f2fs_inode *ri;
 
 	/* Check if ino is within scope */
-	if (check_nid_range(sbi, inode->i_ino)) {
-		f2fs_msg(inode->i_sb, KERN_ERR, "bad inode number: %lu",
-			 (unsigned long) inode->i_ino);
-		WARN_ON(1);
+	if (check_nid_range(sbi, inode->i_ino))
 		return -EINVAL;
-	}
 
 	node_page = get_node_page(sbi, inode->i_ino);
 	if (IS_ERR(node_page))
@@ -445,19 +441,15 @@ no_delete:
 			alloc_nid_failed(sbi, inode->i_ino);
 		clear_inode_flag(fi, FI_FREE_NID);
 	}
-
-	if (err && err != -ENOENT) {
-		if (!exist_written_data(sbi, inode->i_ino, ORPHAN_INO)) {
-			/*
-			 * get here because we failed to release resource
-			 * of inode previously, reminder our user to run fsck
-			 * for fixing.
-			 */
-			set_sbi_flag(sbi, SBI_NEED_FSCK);
-			f2fs_msg(sbi->sb, KERN_WARNING,
-				"inode (ino:%lu) resource leak, run fsck "
-				"to fix this issue!", inode->i_ino);
-		}
+	if (is_inode_flag_set(inode, FI_FREE_NID)) {
+		alloc_nid_failed(sbi, inode->i_ino);
+		clear_inode_flag(inode, FI_FREE_NID);
+	} else {
+		/*
+		 * If xattr nid is corrupted, we can reach out error condition,
+		 * err & !exist_written_data(sbi, inode->i_ino, ORPHAN_INO)).
+		 * In that case, check_nid_range() is enough to give a clue.
+		 */
 	}
 out_clear:
 #ifdef CONFIG_F2FS_FS_ENCRYPTION

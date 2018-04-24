@@ -990,20 +990,6 @@ static inline bool __exist_node_summaries(struct f2fs_sb_info *sbi)
 }
 
 /*
- * Check whether the given nid is within node id range.
- */
-static inline int check_nid_range(struct f2fs_sb_info *sbi, nid_t nid)
-{
-	if (unlikely(nid < F2FS_ROOT_INO(sbi)))
-		return -EINVAL;
-	if (unlikely(nid >= NM_I(sbi)->max_nid))
-		return -EINVAL;
-	return 0;
-}
-
-#define F2FS_DEFAULT_ALLOCATED_BLOCKS	1
-
-/*
  * Check whether the inode has blocks or not
  */
 static inline int F2FS_HAS_BLOCKS(struct inode *inode)
@@ -1797,35 +1783,41 @@ f2fs_hash_t f2fs_dentry_hash(const struct qstr *name_info,
 struct dnode_of_data;
 struct node_info;
 
-bool available_free_memory(struct f2fs_sb_info *, int);
-int need_dentry_mark(struct f2fs_sb_info *, nid_t);
-bool is_checkpointed_node(struct f2fs_sb_info *, nid_t);
-bool need_inode_block_update(struct f2fs_sb_info *, nid_t);
-void get_node_info(struct f2fs_sb_info *, nid_t, struct node_info *);
-int get_dnode_of_data(struct dnode_of_data *, pgoff_t, int);
-int truncate_inode_blocks(struct inode *, pgoff_t);
-int truncate_xattr_node(struct inode *, struct page *);
-int wait_on_node_pages_writeback(struct f2fs_sb_info *, nid_t);
-int remove_inode_page(struct inode *);
-struct page *new_inode_page(struct inode *);
-struct page *new_node_page(struct dnode_of_data *, unsigned int, struct page *);
-void ra_node_page(struct f2fs_sb_info *, nid_t);
-struct page *get_node_page(struct f2fs_sb_info *, pgoff_t);
-struct page *get_node_page_ra(struct page *, int);
-void sync_inode_page(struct dnode_of_data *);
-int sync_node_pages(struct f2fs_sb_info *, nid_t, struct writeback_control *);
-bool alloc_nid(struct f2fs_sb_info *, nid_t *);
-void alloc_nid_done(struct f2fs_sb_info *, nid_t);
-void alloc_nid_failed(struct f2fs_sb_info *, nid_t);
-int try_to_free_nids(struct f2fs_sb_info *, int);
-void recover_inline_xattr(struct inode *, struct page *);
-void recover_xattr_data(struct inode *, struct page *, block_t);
-int recover_inode_page(struct f2fs_sb_info *, struct page *);
-int restore_node_summary(struct f2fs_sb_info *, unsigned int,
-				struct f2fs_summary_block *);
-void flush_nat_entries(struct f2fs_sb_info *);
-int build_node_manager(struct f2fs_sb_info *);
-void destroy_node_manager(struct f2fs_sb_info *);
+int check_nid_range(struct f2fs_sb_info *sbi, nid_t nid);
+bool available_free_memory(struct f2fs_sb_info *sbi, int type);
+int need_dentry_mark(struct f2fs_sb_info *sbi, nid_t nid);
+bool is_checkpointed_node(struct f2fs_sb_info *sbi, nid_t nid);
+bool need_inode_block_update(struct f2fs_sb_info *sbi, nid_t ino);
+void get_node_info(struct f2fs_sb_info *sbi, nid_t nid, struct node_info *ni);
+pgoff_t get_next_page_offset(struct dnode_of_data *dn, pgoff_t pgofs);
+int get_dnode_of_data(struct dnode_of_data *dn, pgoff_t index, int mode);
+int truncate_inode_blocks(struct inode *inode, pgoff_t from);
+int truncate_xattr_node(struct inode *inode);
+int wait_on_node_pages_writeback(struct f2fs_sb_info *sbi, nid_t ino);
+int remove_inode_page(struct inode *inode);
+struct page *new_inode_page(struct inode *inode);
+struct page *new_node_page(struct dnode_of_data *dn, unsigned int ofs);
+void ra_node_page(struct f2fs_sb_info *sbi, nid_t nid);
+struct page *get_node_page(struct f2fs_sb_info *sbi, pgoff_t nid);
+struct page *get_node_page_ra(struct page *parent, int start);
+void move_node_page(struct page *node_page, int gc_type);
+int fsync_node_pages(struct f2fs_sb_info *sbi, struct inode *inode,
+			struct writeback_control *wbc, bool atomic);
+int sync_node_pages(struct f2fs_sb_info *sbi, struct writeback_control *wbc,
+			bool do_balance, enum iostat_type io_type);
+void build_free_nids(struct f2fs_sb_info *sbi, bool sync, bool mount);
+bool alloc_nid(struct f2fs_sb_info *sbi, nid_t *nid);
+void alloc_nid_done(struct f2fs_sb_info *sbi, nid_t nid);
+void alloc_nid_failed(struct f2fs_sb_info *sbi, nid_t nid);
+int try_to_free_nids(struct f2fs_sb_info *sbi, int nr_shrink);
+void recover_inline_xattr(struct inode *inode, struct page *page);
+int recover_xattr_data(struct inode *inode, struct page *page);
+int recover_inode_page(struct f2fs_sb_info *sbi, struct page *page);
+void restore_node_summary(struct f2fs_sb_info *sbi,
+			unsigned int segno, struct f2fs_summary_block *sum);
+void flush_nat_entries(struct f2fs_sb_info *sbi, struct cp_control *cpc);
+int build_node_manager(struct f2fs_sb_info *sbi);
+void destroy_node_manager(struct f2fs_sb_info *sbi);
 int __init create_node_manager_caches(void);
 void destroy_node_manager_caches(void);
 

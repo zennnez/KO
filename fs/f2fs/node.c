@@ -28,6 +28,21 @@ static struct kmem_cache *nat_entry_slab;
 static struct kmem_cache *free_nid_slab;
 static struct kmem_cache *nat_entry_set_slab;
 
+/*
+ * Check whether the given nid is within node id range.
+ */
+int check_nid_range(struct f2fs_sb_info *sbi, nid_t nid)
+{
+	if (unlikely(nid < F2FS_ROOT_INO(sbi) || nid >= NM_I(sbi)->max_nid)) {
+		set_sbi_flag(sbi, SBI_NEED_FSCK);
+		f2fs_msg(sbi->sb, KERN_WARNING,
+				"%s: out-of-range nid=%x, run fsck to fix.",
+				__func__, nid);
+		return -EINVAL;
+	}
+	return 0;
+}
+
 bool available_free_memory(struct f2fs_sb_info *sbi, int type)
 {
 	struct f2fs_nm_info *nm_i = NM_I(sbi);
@@ -1035,9 +1050,15 @@ void ra_node_page(struct f2fs_sb_info *sbi, nid_t nid)
 	struct page *apage;
 	int err;
 
-	apage = find_get_page(NODE_MAPPING(sbi), nid);
-	if (apage && PageUptodate(apage)) {
-		f2fs_put_page(apage, 0);
+	if (!nid)
+		return;
+	if (check_nid_range(sbi, nid))
+		return;
+
+	rcu_read_lock();
+	apage = radix_tree_lookup(&NODE_MAPPING(sbi)->page_tree, nid);
+	rcu_read_unlock();
+	if (apage)
 		return;
 	}
 	f2fs_put_page(apage, 0);
@@ -1095,6 +1116,8 @@ struct page *get_node_page_ra(struct page *parent, int start)
 	nid = get_nid(parent, start, false);
 	if (!nid)
 		return ERR_PTR(-ENOENT);
+	if (check_nid_range(sbi, nid))
+		return ERR_PTR(-EINVAL);
 repeat:
 	page = grab_cache_page(NODE_MAPPING(sbi), nid);
 	if (!page)
