@@ -722,9 +722,17 @@ next_step:
 				continue;
 			}
 
-			start_bidx = start_bidx_of_node(nofs, F2FS_I(inode));
+			if (!down_write_trylock(
+				&F2FS_I(inode)->i_gc_rwsem[WRITE])) {
+				iput(inode);
+				continue;
+			}
+
+			start_bidx = start_bidx_of_node(nofs, inode);
 			data_page = get_read_data_page(inode,
-					start_bidx + ofs_in_node, READA, true);
+					start_bidx + ofs_in_node, REQ_RAHEAD,
+					true);
+			up_write(&F2FS_I(inode)->i_gc_rwsem[WRITE]);
 			if (IS_ERR(data_page)) {
 				iput(inode);
 				continue;
@@ -738,12 +746,36 @@ next_step:
 		/* phase 3 */
 		inode = find_gc_inode(gc_list, dni.ino);
 		if (inode) {
-			start_bidx = start_bidx_of_node(nofs, F2FS_I(inode))
+			struct f2fs_inode_info *fi = F2FS_I(inode);
+			bool locked = false;
+
+			if (S_ISREG(inode->i_mode)) {
+				if (!down_write_trylock(&fi->i_gc_rwsem[READ]))
+					continue;
+				if (!down_write_trylock(
+						&fi->i_gc_rwsem[WRITE])) {
+					up_write(&fi->i_gc_rwsem[READ]);
+					continue;
+				}
+				locked = true;
+
+				/* wait for all inflight aio data */
+				inode_dio_wait(inode);
+			}
+
+			start_bidx = start_bidx_of_node(nofs, inode)
 								+ ofs_in_node;
 			if (f2fs_encrypted_inode(inode) && S_ISREG(inode->i_mode))
 				move_encrypted_block(inode, start_bidx);
 			else
-				move_data_page(inode, start_bidx, gc_type);
+				move_data_page(inode, start_bidx, gc_type,
+								segno, off);
+
+			if (locked) {
+				up_write(&fi->i_gc_rwsem[WRITE]);
+				up_write(&fi->i_gc_rwsem[READ]);
+			}
+
 			stat_inc_data_blk_count(sbi, 1, gc_type);
 		}
 	}

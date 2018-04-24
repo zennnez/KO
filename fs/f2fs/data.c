@@ -1601,39 +1601,30 @@ static ssize_t f2fs_direct_IO(struct kiocb *iocb, struct iov_iter *iter,
 	if (err)
 		return err;
 
-	trace_f2fs_direct_IO_enter(inode, offset, count, iov_iter_rw(iter));
-
-	if (trace_android_fs_dataread_start_enabled() &&
-	    (iov_iter_rw(iter) == READ)) {
-		char *path, pathbuf[MAX_TRACE_PATHBUF_LEN];
-
-		path = android_fstrace_get_pathname(pathbuf,
-						    MAX_TRACE_PATHBUF_LEN,
-						    inode);
-		trace_android_fs_dataread_start(inode, offset,
-						count, current->pid, path,
-						current->comm);
-	}
-	if (trace_android_fs_datawrite_start_enabled() &&
-	    (iov_iter_rw(iter) == WRITE)) {
-		char *path, pathbuf[MAX_TRACE_PATHBUF_LEN];
-
-		path = android_fstrace_get_pathname(pathbuf,
-						    MAX_TRACE_PATHBUF_LEN,
-						    inode);
-		trace_android_fs_datawrite_start(inode, offset, count,
-						 current->pid, path,
-						 current->comm);
-	}
-	if (iov_iter_rw(iter) == WRITE) {
-		__allocate_data_blocks(inode, offset, count);
-		if (unlikely(f2fs_cp_error(F2FS_I_SB(inode)))) {
-			err = -EIO;
+	if (!down_read_trylock(&F2FS_I(inode)->i_gc_rwsem[rw])) {
+		if (iocb->ki_flags & IOCB_NOWAIT) {
+			iocb->ki_hint = hint;
+			err = -EAGAIN;
 			goto out;
 		}
+		down_read(&F2FS_I(inode)->i_gc_rwsem[rw]);
 	}
 
 	err = blockdev_direct_IO(iocb, inode, iter, offset, get_data_block_dio);
+	up_read(&F2FS_I(inode)->i_gc_rwsem[rw]);
+
+	if (rw == WRITE) {
+		if (whint_mode == WHINT_MODE_OFF)
+			iocb->ki_hint = hint;
+		if (err > 0) {
+			f2fs_update_iostat(F2FS_I_SB(inode), APP_DIRECT_IO,
+									err);
+			set_inode_flag(inode, FI_UPDATE_WRITE);
+		} else if (err < 0) {
+			f2fs_write_failed(mapping, offset + count);
+		}
+	}
+
 out:
 	if (err < 0 && iov_iter_rw(iter) == WRITE)
 		f2fs_write_failed(mapping, offset + count);

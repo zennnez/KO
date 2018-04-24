@@ -441,10 +441,16 @@ struct f2fs_inode_info {
 
 	struct extent_tree *extent_tree;	/* cached extent_tree entry */
 
-#ifdef CONFIG_F2FS_FS_ENCRYPTION
-	/* Encryption params */
-	struct f2fs_crypt_info *i_crypt_info;
-#endif
+	/* avoid racing between foreground op and gc */
+	struct rw_semaphore i_gc_rwsem[2];
+	struct rw_semaphore i_mmap_sem;
+	struct rw_semaphore i_xattr_sem; /* avoid racing between reading and changing EAs */
+
+	int i_extra_isize;		/* size of extra space located in i_addr */
+	kprojid_t i_projid;		/* id for project quota */
+	int i_inline_xattr_size;	/* inline xattr size */
+	struct timespec i_crtime;	/* inode creation time */
+	struct timespec i_disk_time[4];	/* inode disk times */
 };
 
 static inline void get_extent_info(struct extent_info *ext,
