@@ -1432,16 +1432,20 @@ static void add_discard_addrs(struct f2fs_sb_info *sbi, struct cp_control *cpc)
 	}
 }
 
+static void release_discard_addr(struct discard_entry *entry)
+{
+	list_del(&entry->list);
+	kmem_cache_free(discard_entry_slab, entry);
+}
+
 void release_discard_addrs(struct f2fs_sb_info *sbi)
 {
 	struct list_head *head = &(SM_I(sbi)->discard_list);
 	struct discard_entry *entry, *this;
 
 	/* drop caches */
-	list_for_each_entry_safe(entry, this, head, list) {
-		list_del(&entry->list);
-		kmem_cache_free(discard_entry_slab, entry);
-	}
+	list_for_each_entry_safe(entry, this, head, list)
+		release_discard_addr(entry);
 }
 
 /*
@@ -1496,9 +1500,14 @@ void clear_prefree_segments(struct f2fs_sb_info *sbi, struct cp_control *cpc)
 		f2fs_issue_discard(sbi, entry->blkaddr, entry->len);
 		cpc->trimmed += entry->len;
 skip:
-		list_del(&entry->list);
-		SM_I(sbi)->nr_discards -= entry->len;
-		kmem_cache_free(discard_entry_slab, entry);
+		cur_pos = next_pos;
+		is_valid = !is_valid;
+
+		if (cur_pos < sbi->blocks_per_seg)
+			goto find_next;
+
+		release_discard_addr(entry);
+		dcc->nr_discards -= total_len;
 	}
 }
 
