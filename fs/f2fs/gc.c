@@ -304,7 +304,7 @@ static int get_victim_by_default(struct f2fs_sb_info *sbi,
 		if (sec_usage_check(sbi, secno))
 			continue;
 		if (gc_type == BG_GC && test_bit(secno, dirty_i->victim_secmap))
-			continue;
+			goto next;
 
 		cost = get_gc_cost(sbi, segno, &p);
 
@@ -920,4 +920,11 @@ stop:
 void build_gc_manager(struct f2fs_sb_info *sbi)
 {
 	DIRTY_I(sbi)->v_ops = &default_v_ops;
+
+	sbi->gc_pin_file_threshold = DEF_GC_FAILED_PINNED_FILES;
+
+	/* give warm/cold data area from slower device */
+	if (sbi->s_ndevs && sbi->segs_per_sec == 1)
+		SIT_I(sbi)->last_victim[ALLOC_NEXT] =
+				GET_SEGNO(sbi, FDEV(0).end_blk) + 1;
 }
