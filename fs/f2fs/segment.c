@@ -176,13 +176,19 @@ aligned:
 	if (!size)
 		return result;
 
-	tmp = __reverse_ulong((unsigned char *)p);
-found_first:
-	tmp |= ~(~0UL << (BITS_PER_LONG - size));
-	if (tmp == ~0UL)	/* Are any bits zero? */
-		return result + size;   /* Nope. */
-found_middle:
-	return result + __reverse_ffz(tmp);
+bool need_SSR(struct f2fs_sb_info *sbi)
+{
+	int node_secs = get_blocktype_secs(sbi, F2FS_DIRTY_NODES);
+	int dent_secs = get_blocktype_secs(sbi, F2FS_DIRTY_DENTS);
+	int imeta_secs = get_blocktype_secs(sbi, F2FS_DIRTY_IMETA);
+
+	if (test_opt(sbi, LFS))
+		return false;
+	if (sbi->gc_mode == GC_URGENT)
+		return true;
+
+	return free_sections(sbi) <= (node_secs + 2 * dent_secs + imeta_secs +
+			SM_I(sbi)->min_ssr_sections + reserved_sections(sbi));
 }
 
 void register_inmem_page(struct inode *inode, struct page *page)
@@ -1338,7 +1344,7 @@ bool discard_next_dnode(struct f2fs_sb_info *sbi, block_t blkaddr)
 		if (dcc->discard_wake)
 			dcc->discard_wake = 0;
 
-		if (sbi->gc_thread && sbi->gc_thread->gc_urgent)
+		if (sbi->gc_mode == GC_URGENT)
 			__init_discard_policy(sbi, &dpolicy, DPOLICY_FORCE, 1);
 
 		sb_start_intwrite(sbi->sb);
