@@ -417,12 +417,20 @@ struct f2fs_map_blocks {
 
 #define DEF_DIR_LEVEL		0
 
+enum {
+	GC_FAILURE_PIN,
+	GC_FAILURE_ATOMIC,
+	MAX_GC_FAILURE
+};
+
 struct f2fs_inode_info {
 	struct inode vfs_inode;		/* serve a vfs inode */
 	unsigned long i_flags;		/* keep an inode flags for ioctl */
 	unsigned char i_advise;		/* use to give file attribute hints */
 	unsigned char i_dir_level;	/* use for dentry level for large dir */
-	unsigned int i_current_depth;	/* use only in directory structure */
+	unsigned int i_current_depth;	/* only for directory depth */
+	/* for gc failure statistic */
+	unsigned int i_gc_failures[MAX_GC_FAILURE];
 	unsigned int i_pino;		/* parent inode number */
 	umode_t i_acl_mode;		/* keep file acl mode temporarily */
 
@@ -831,6 +839,8 @@ struct f2fs_sb_info {
 	struct f2fs_gc_kthread	*gc_thread;	/* GC thread */
 	unsigned int cur_victim_sec;		/* current victim section num */
 	unsigned int gc_mode;			/* current GC state */
+	/* for skip statistic */
+	unsigned long long skipped_atomic_files[2];	/* FG_GC and BG_GC */
 
 	/* threshold for gc trials on pinned files */
 	u64 gc_pin_file_threshold;
@@ -1513,6 +1523,14 @@ enum {
 	FI_DROP_CACHE,		/* drop dirty page cache */
 	FI_DATA_EXIST,		/* indicate data exists */
 	FI_INLINE_DOTS,		/* indicate inline dot dentries */
+	FI_DO_DEFRAG,		/* indicate defragment is running */
+	FI_DIRTY_FILE,		/* indicate regular/symlink has dirty pages */
+	FI_NO_PREALLOC,		/* indicate skipped preallocated blocks */
+	FI_HOT_DATA,		/* indicate file is hot */
+	FI_EXTRA_ATTR,		/* indicate file has extra attribute */
+	FI_PROJ_INHERIT,	/* indicate file inherits projectid */
+	FI_PIN_FILE,		/* indicate file should not be gced */
+	FI_ATOMIC_REVOKE_REQUEST, /* request to drop atomic data */
 };
 
 static inline void set_inode_flag(struct f2fs_inode_info *fi, int flag)
@@ -1541,6 +1559,47 @@ static inline void set_acl_inode(struct f2fs_inode_info *fi, umode_t mode)
 static inline void get_inline_info(struct f2fs_inode_info *fi,
 					struct f2fs_inode *ri)
 {
+	bool clean = !is_inode_flag_set(inode, FI_DIRTY_INODE);
+	bool recover = is_inode_flag_set(inode, FI_AUTO_RECOVER);
+
+	if (i_size_read(inode) == i_size)
+		return;
+
+	i_size_write(inode, i_size);
+	f2fs_mark_inode_dirty_sync(inode, true);
+	if (clean || recover)
+		set_inode_flag(inode, FI_AUTO_RECOVER);
+}
+
+static inline void f2fs_i_depth_write(struct inode *inode, unsigned int depth)
+{
+	F2FS_I(inode)->i_current_depth = depth;
+	f2fs_mark_inode_dirty_sync(inode, true);
+}
+
+static inline void f2fs_i_gc_failures_write(struct inode *inode,
+					unsigned int count)
+{
+	F2FS_I(inode)->i_gc_failures[GC_FAILURE_PIN] = count;
+	f2fs_mark_inode_dirty_sync(inode, true);
+}
+
+static inline void f2fs_i_xnid_write(struct inode *inode, nid_t xnid)
+{
+	F2FS_I(inode)->i_xattr_nid = xnid;
+	f2fs_mark_inode_dirty_sync(inode, true);
+}
+
+static inline void f2fs_i_pino_write(struct inode *inode, nid_t pino)
+{
+	F2FS_I(inode)->i_pino = pino;
+	f2fs_mark_inode_dirty_sync(inode, true);
+}
+
+static inline void get_inline_info(struct inode *inode, struct f2fs_inode *ri)
+{
+	struct f2fs_inode_info *fi = F2FS_I(inode);
+
 	if (ri->i_inline & F2FS_INLINE_XATTR)
 		set_inode_flag(fi, FI_INLINE_XATTR);
 	if (ri->i_inline & F2FS_INLINE_DATA)
@@ -1877,41 +1936,57 @@ void destroy_node_manager_caches(void);
 /*
  * segment.c
  */
-void register_inmem_page(struct inode *, struct page *);
-int commit_inmem_pages(struct inode *, bool);
-void f2fs_balance_fs(struct f2fs_sb_info *);
-void f2fs_balance_fs_bg(struct f2fs_sb_info *);
-int f2fs_issue_flush(struct f2fs_sb_info *);
-int create_flush_cmd_control(struct f2fs_sb_info *);
-void destroy_flush_cmd_control(struct f2fs_sb_info *);
-void invalidate_blocks(struct f2fs_sb_info *, block_t);
-bool is_checkpointed_data(struct f2fs_sb_info *, block_t);
-void refresh_sit_entry(struct f2fs_sb_info *, block_t, block_t);
-void clear_prefree_segments(struct f2fs_sb_info *, struct cp_control *);
-void release_discard_addrs(struct f2fs_sb_info *);
-bool discard_next_dnode(struct f2fs_sb_info *, block_t);
-int npages_for_summary_flush(struct f2fs_sb_info *, bool);
-void allocate_new_segments(struct f2fs_sb_info *);
-int f2fs_trim_fs(struct f2fs_sb_info *, struct fstrim_range *);
-struct page *get_sum_page(struct f2fs_sb_info *, unsigned int);
-void update_meta_page(struct f2fs_sb_info *, void *, block_t);
-void write_meta_page(struct f2fs_sb_info *, struct page *);
-void write_node_page(unsigned int, struct f2fs_io_info *);
-void write_data_page(struct dnode_of_data *, struct f2fs_io_info *);
-void rewrite_data_page(struct f2fs_io_info *);
-void f2fs_replace_block(struct f2fs_sb_info *, struct dnode_of_data *,
-				block_t, block_t, unsigned char, bool);
-void allocate_data_block(struct f2fs_sb_info *, struct page *,
-		block_t, block_t *, struct f2fs_summary *, int);
-void f2fs_wait_on_page_writeback(struct page *, enum page_type);
-void f2fs_wait_on_encrypted_page_writeback(struct f2fs_sb_info *, block_t);
-void write_data_summaries(struct f2fs_sb_info *, block_t);
-void write_node_summaries(struct f2fs_sb_info *, block_t);
-int lookup_journal_in_cursum(struct f2fs_summary_block *,
-					int, unsigned int, int);
-void flush_sit_entries(struct f2fs_sb_info *, struct cp_control *);
-int build_segment_manager(struct f2fs_sb_info *);
-void destroy_segment_manager(struct f2fs_sb_info *);
+bool need_SSR(struct f2fs_sb_info *sbi);
+void register_inmem_page(struct inode *inode, struct page *page);
+void drop_inmem_pages_all(struct f2fs_sb_info *sbi, bool gc_failure);
+void drop_inmem_pages(struct inode *inode);
+void drop_inmem_page(struct inode *inode, struct page *page);
+int commit_inmem_pages(struct inode *inode);
+void f2fs_balance_fs(struct f2fs_sb_info *sbi, bool need);
+void f2fs_balance_fs_bg(struct f2fs_sb_info *sbi);
+int f2fs_issue_flush(struct f2fs_sb_info *sbi, nid_t ino);
+int create_flush_cmd_control(struct f2fs_sb_info *sbi);
+int f2fs_flush_device_cache(struct f2fs_sb_info *sbi);
+void destroy_flush_cmd_control(struct f2fs_sb_info *sbi, bool free);
+void invalidate_blocks(struct f2fs_sb_info *sbi, block_t addr);
+bool is_checkpointed_data(struct f2fs_sb_info *sbi, block_t blkaddr);
+void drop_discard_cmd(struct f2fs_sb_info *sbi);
+void stop_discard_thread(struct f2fs_sb_info *sbi);
+bool f2fs_wait_discard_bios(struct f2fs_sb_info *sbi);
+void clear_prefree_segments(struct f2fs_sb_info *sbi, struct cp_control *cpc);
+void release_discard_addrs(struct f2fs_sb_info *sbi);
+int npages_for_summary_flush(struct f2fs_sb_info *sbi, bool for_ra);
+void allocate_new_segments(struct f2fs_sb_info *sbi);
+int f2fs_trim_fs(struct f2fs_sb_info *sbi, struct fstrim_range *range);
+bool exist_trim_candidates(struct f2fs_sb_info *sbi, struct cp_control *cpc);
+struct page *get_sum_page(struct f2fs_sb_info *sbi, unsigned int segno);
+void update_meta_page(struct f2fs_sb_info *sbi, void *src, block_t blk_addr);
+void write_meta_page(struct f2fs_sb_info *sbi, struct page *page,
+						enum iostat_type io_type);
+void write_node_page(unsigned int nid, struct f2fs_io_info *fio);
+void write_data_page(struct dnode_of_data *dn, struct f2fs_io_info *fio);
+int rewrite_data_page(struct f2fs_io_info *fio);
+void __f2fs_replace_block(struct f2fs_sb_info *sbi, struct f2fs_summary *sum,
+			block_t old_blkaddr, block_t new_blkaddr,
+			bool recover_curseg, bool recover_newaddr);
+void f2fs_replace_block(struct f2fs_sb_info *sbi, struct dnode_of_data *dn,
+			block_t old_addr, block_t new_addr,
+			unsigned char version, bool recover_curseg,
+			bool recover_newaddr);
+void allocate_data_block(struct f2fs_sb_info *sbi, struct page *page,
+			block_t old_blkaddr, block_t *new_blkaddr,
+			struct f2fs_summary *sum, int type,
+			struct f2fs_io_info *fio, bool add_list);
+void f2fs_wait_on_page_writeback(struct page *page,
+			enum page_type type, bool ordered);
+void f2fs_wait_on_block_writeback(struct f2fs_sb_info *sbi, block_t blkaddr);
+void write_data_summaries(struct f2fs_sb_info *sbi, block_t start_blk);
+void write_node_summaries(struct f2fs_sb_info *sbi, block_t start_blk);
+int lookup_journal_in_cursum(struct f2fs_journal *journal, int type,
+			unsigned int val, int alloc);
+void flush_sit_entries(struct f2fs_sb_info *sbi, struct cp_control *cpc);
+int build_segment_manager(struct f2fs_sb_info *sbi);
+void destroy_segment_manager(struct f2fs_sb_info *sbi);
 int __init create_segment_manager_caches(void);
 void destroy_segment_manager_caches(void);
 
@@ -2012,6 +2087,7 @@ struct f2fs_stat_info {
 	int bg_node_segs, bg_data_segs;
 	int tot_blks, data_blks, node_blks;
 	int bg_data_blks, bg_node_blks;
+	unsigned long long skipped_atomic_files[2];
 	int curseg[NR_CURSEG_TYPE];
 	int cursec[NR_CURSEG_TYPE];
 	int curzone[NR_CURSEG_TYPE];
