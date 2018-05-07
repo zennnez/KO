@@ -49,6 +49,9 @@ static struct inode *f2fs_new_inode(struct inode *dir, umode_t mode)
 	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
 	inode->i_generation = sbi->s_next_generation++;
 
+	if (S_ISDIR(inode->i_mode))
+		F2FS_I(inode)->i_current_depth = 1;
+
 	err = insert_inode_locked(inode);
 	if (err) {
 		err = -EINVAL;
