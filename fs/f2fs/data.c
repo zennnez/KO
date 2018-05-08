@@ -28,7 +28,47 @@
 #include <trace/events/f2fs.h>
 #include <trace/events/android_fs.h>
 
-static void f2fs_read_end_io(struct bio *bio)
+#define NUM_PREALLOC_POST_READ_CTXS	128
+
+static struct kmem_cache *bio_post_read_ctx_cache;
+static mempool_t *bio_post_read_ctx_pool;
+
+static bool __is_cp_guaranteed(struct page *page)
+{
+	struct address_space *mapping = page->mapping;
+	struct inode *inode;
+	struct f2fs_sb_info *sbi;
+
+	if (!mapping)
+		return false;
+
+	inode = mapping->host;
+	sbi = F2FS_I_SB(inode);
+
+	if (inode->i_ino == F2FS_META_INO(sbi) ||
+			inode->i_ino ==  F2FS_NODE_INO(sbi) ||
+			S_ISDIR(inode->i_mode) ||
+			(S_ISREG(inode->i_mode) &&
+			is_inode_flag_set(inode, FI_ATOMIC_FILE)) ||
+			is_cold_data(page))
+		return true;
+	return false;
+}
+
+/* postprocessing steps for read bios */
+enum bio_post_read_step {
+	STEP_INITIAL = 0,
+	STEP_DECRYPT,
+};
+
+struct bio_post_read_ctx {
+	struct bio *bio;
+	struct work_struct work;
+	unsigned int cur_step;
+	unsigned int enabled_steps;
+};
+
+static void __read_end_io(struct bio *bio)
 {
 	struct bio_vec *bvec;
 	int i;
