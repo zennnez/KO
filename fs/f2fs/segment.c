@@ -1341,6 +1341,10 @@ bool discard_next_dnode(struct f2fs_sb_info *sbi, block_t blkaddr)
 				kthread_should_stop() || freezing(current) ||
 				dcc->discard_wake,
 				msecs_to_jiffies(wait_ms));
+
+		if (dcc->discard_wake)
+			dcc->discard_wake = 0;
+
 		if (try_to_freeze())
 			continue;
 		if (f2fs_readonly(sbi->sb))
@@ -1351,9 +1355,6 @@ bool discard_next_dnode(struct f2fs_sb_info *sbi, block_t blkaddr)
 			wait_ms = dpolicy.max_interval;
 			continue;
 		}
-
-		if (dcc->discard_wake)
-			dcc->discard_wake = 0;
 
 		if (sbi->gc_mode == GC_URGENT)
 			__init_discard_policy(sbi, &dpolicy, DPOLICY_FORCE, 1);
