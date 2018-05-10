@@ -94,7 +94,7 @@ int vm_highmem_is_dirtyable;
 #ifdef CONFIG_ZEN_INTERACTIVE
 int vm_dirty_ratio = 50;
 #else
-int vm_dirty_ratio = 20;
+int vm_dirty_ratio = 2;
 #endif
 
 /*
