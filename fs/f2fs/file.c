@@ -1590,6 +1590,12 @@ static int f2fs_ioc_shutdown(struct file *filp, unsigned long arg)
 	if (get_user(in, (__u32 __user *)arg))
 		return -EFAULT;
 
+	if (in != F2FS_GOING_DOWN_FULLSYNC) {
+		ret = mnt_want_write_file(filp);
+		if (ret)
+			return ret;
+	}
+
 	switch (in) {
 	case F2FS_GOING_DOWN_FULLSYNC:
 		sb = freeze_bdev(sb->s_bdev);
@@ -1613,7 +1619,18 @@ static int f2fs_ioc_shutdown(struct file *filp, unsigned long arg)
 	default:
 		return -EINVAL;
 	}
-	return 0;
+
+	stop_gc_thread(sbi);
+	stop_discard_thread(sbi);
+
+	drop_discard_cmd(sbi);
+	clear_opt(sbi, DISCARD);
+
+	f2fs_update_time(sbi, REQ_TIME);
+out:
+	if (in != F2FS_GOING_DOWN_FULLSYNC)
+		mnt_drop_write_file(filp);
+	return ret;
 }
 
 static int f2fs_ioc_fitrim(struct file *filp, unsigned long arg)
