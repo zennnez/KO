@@ -1439,6 +1439,13 @@ retry:
 		for (i = 0; i < nr_pages; i++) {
 			struct page *page = pvec.pages[i];
 
+			/* give a priority to WB_SYNC threads */
+			if (atomic_read(&F2FS_M_SB(mapping)->wb_sync_req) &&
+					wbc->sync_mode == WB_SYNC_NONE) {
+				done = 1;
+				break;
+			}
+
 			done_index = page->index;
 
 			lock_page(page);
@@ -1481,7 +1488,7 @@ continue_unlock:
 			}
 
 			if (--wbc->nr_to_write <= 0 &&
-			    wbc->sync_mode == WB_SYNC_NONE) {
+					wbc->sync_mode == WB_SYNC_NONE) {
 				done = 1;
 				break;
 			}
