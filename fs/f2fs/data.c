@@ -211,7 +211,9 @@ void f2fs_submit_page_mbio(struct f2fs_io_info *fio)
 	bool is_read = is_read_io(fio->rw);
 	struct page *bio_page;
 
-	io = is_read ? &sbi->read_io : &sbi->write_io[btype];
+	if (is_valid_blkaddr(fio->old_blkaddr))
+		verify_block_addr(fio, fio->old_blkaddr);
+	verify_block_addr(fio, fio->new_blkaddr);
 
 	verify_block_addr(sbi, fio->blk_addr);
 
@@ -644,7 +646,15 @@ static int f2fs_map_blocks(struct inode *inode, struct f2fs_map_blocks *map,
 		goto unlock_out;
 	}
 
-	if (dn.data_blkaddr == NEW_ADDR || dn.data_blkaddr == NULL_ADDR) {
+	start_pgofs = pgofs;
+	prealloc = 0;
+	last_ofs_in_node = ofs_in_node = dn.ofs_in_node;
+	end_offset = ADDRS_PER_PAGE(dn.node_page, inode);
+
+next_block:
+	blkaddr = datablock_addr(dn.inode, dn.node_page, dn.ofs_in_node);
+
+	if (!is_valid_blkaddr(blkaddr)) {
 		if (create) {
 			if (unlikely(f2fs_cp_error(sbi))) {
 				err = -EIO;
@@ -1087,6 +1097,108 @@ static int f2fs_read_data_pages(struct file *file,
 	return f2fs_mpage_readpages(mapping, pages, NULL, nr_pages);
 }
 
+static int encrypt_one_page(struct f2fs_io_info *fio)
+{
+	struct inode *inode = fio->page->mapping->host;
+	gfp_t gfp_flags = GFP_NOFS;
+
+	if (!f2fs_encrypted_file(inode))
+		return 0;
+
+	/* wait for GCed page writeback via META_MAPPING */
+	f2fs_wait_on_block_writeback(fio->sbi, fio->old_blkaddr);
+
+retry_encrypt:
+	fio->encrypted_page = fscrypt_encrypt_page(inode, fio->page,
+			PAGE_SIZE, 0, fio->page->index, gfp_flags);
+	if (!IS_ERR(fio->encrypted_page))
+		return 0;
+
+	/* flush pending IOs and wait for a while in the ENOMEM case */
+	if (PTR_ERR(fio->encrypted_page) == -ENOMEM) {
+		f2fs_flush_merged_writes(fio->sbi);
+		congestion_wait(BLK_RW_ASYNC, HZ/50);
+		gfp_flags |= __GFP_NOFAIL;
+		goto retry_encrypt;
+	}
+	return PTR_ERR(fio->encrypted_page);
+}
+
+static inline bool check_inplace_update_policy(struct inode *inode,
+				struct f2fs_io_info *fio)
+{
+	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
+	unsigned int policy = SM_I(sbi)->ipu_policy;
+
+	if (policy & (0x1 << F2FS_IPU_FORCE))
+		return true;
+	if (policy & (0x1 << F2FS_IPU_SSR) && need_SSR(sbi))
+		return true;
+	if (policy & (0x1 << F2FS_IPU_UTIL) &&
+			utilization(sbi) > SM_I(sbi)->min_ipu_util)
+		return true;
+	if (policy & (0x1 << F2FS_IPU_SSR_UTIL) && need_SSR(sbi) &&
+			utilization(sbi) > SM_I(sbi)->min_ipu_util)
+		return true;
+
+	/*
+	 * IPU for rewrite async pages
+	 */
+	if (policy & (0x1 << F2FS_IPU_ASYNC) &&
+			fio && fio->op == REQ_OP_WRITE &&
+			!(fio->op_flags & REQ_SYNC) &&
+			!f2fs_encrypted_inode(inode))
+		return true;
+
+	/* this is only set during fdatasync */
+	if (policy & (0x1 << F2FS_IPU_FSYNC) &&
+			is_inode_flag_set(inode, FI_NEED_IPU))
+		return true;
+
+	return false;
+}
+
+bool should_update_inplace(struct inode *inode, struct f2fs_io_info *fio)
+{
+	if (f2fs_is_pinned_file(inode))
+		return true;
+
+	/* if this is cold file, we should overwrite to avoid fragmentation */
+	if (file_is_cold(inode))
+		return true;
+
+	return check_inplace_update_policy(inode, fio);
+}
+
+bool should_update_outplace(struct inode *inode, struct f2fs_io_info *fio)
+{
+	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
+
+	if (test_opt(sbi, LFS))
+		return true;
+	if (S_ISDIR(inode->i_mode))
+		return true;
+	if (f2fs_is_atomic_file(inode))
+		return true;
+	if (fio) {
+		if (is_cold_data(fio->page))
+			return true;
+		if (IS_ATOMIC_WRITTEN_PAGE(fio->page))
+			return true;
+	}
+	return false;
+}
+
+static inline bool need_inplace_update(struct f2fs_io_info *fio)
+{
+	struct inode *inode = fio->page->mapping->host;
+
+	if (should_update_outplace(inode, fio))
+		return false;
+
+	return should_update_inplace(inode, fio);
+}
+
 int do_write_data_page(struct f2fs_io_info *fio)
 {
 	struct page *page = fio->page;
@@ -1095,6 +1207,21 @@ int do_write_data_page(struct f2fs_io_info *fio)
 	int err = 0;
 
 	set_new_dnode(&dn, inode, NULL, NULL, 0);
+	if (need_inplace_update(fio) &&
+			f2fs_lookup_extent_cache(inode, page->index, &ei)) {
+		fio->old_blkaddr = ei.blk + page->index - ei.fofs;
+
+		if (is_valid_blkaddr(fio->old_blkaddr)) {
+			ipu_force = true;
+			fio->need_lock = LOCK_DONE;
+			goto got_it;
+		}
+	}
+
+	/* Deadlock due to between page->lock and f2fs_lock_op */
+	if (fio->need_lock == LOCK_REQ && !f2fs_trylock_op(fio->sbi))
+		return -EAGAIN;
+
 	err = get_dnode_of_data(&dn, page->index, LOOKUP_NODE);
 	if (err)
 		return err;
@@ -1106,6 +1233,16 @@ int do_write_data_page(struct f2fs_io_info *fio)
 		ClearPageUptodate(page);
 		goto out_writepage;
 	}
+got_it:
+	/*
+	 * If current allocation needs SSR,
+	 * it had better in-place writes for updated data.
+	 */
+	if (ipu_force || (is_valid_blkaddr(fio->old_blkaddr) &&
+					need_inplace_update(fio))) {
+		err = encrypt_one_page(fio);
+		if (err)
+			goto out_writepage;
 
 	if (f2fs_encrypted_inode(inode) && S_ISREG(inode->i_mode)) {
 
