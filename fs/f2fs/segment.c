@@ -2172,13 +2172,26 @@ void allocate_data_block(struct f2fs_sb_info *sbi, struct page *page,
 
 static void do_write_page(struct f2fs_summary *sum, struct f2fs_io_info *fio)
 {
-	int type = __get_segment_type(fio->page, fio->type);
+	int type = __get_segment_type(fio);
+	int err;
+	bool keep_order = (test_opt(fio->sbi, LFS) && type == CURSEG_COLD_DATA);
 
-	allocate_data_block(fio->sbi, fio->page, fio->blk_addr,
-					&fio->blk_addr, sum, type);
+	if (keep_order)
+		down_read(&fio->sbi->io_order_lock);
+reallocate:
+	allocate_data_block(fio->sbi, fio->page, fio->old_blkaddr,
+			&fio->new_blkaddr, sum, type, fio, true);
 
 	/* writeout dirty page into bdev */
-	f2fs_submit_page_mbio(fio);
+	err = f2fs_submit_page_write(fio);
+	if (err == -EAGAIN) {
+		fio->old_blkaddr = fio->new_blkaddr;
+		goto reallocate;
+	} else if (!err) {
+		update_device_state(fio);
+	}
+	if (keep_order)
+		up_read(&fio->sbi->io_order_lock);
 }
 
 void write_meta_page(struct f2fs_sb_info *sbi, struct page *page)

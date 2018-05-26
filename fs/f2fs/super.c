@@ -1502,6 +1502,28 @@ static void init_sb_info(struct f2fs_sb_info *sbi)
 
 	INIT_LIST_HEAD(&sbi->s_list);
 	mutex_init(&sbi->umount_mutex);
+	for (i = 0; i < NR_PAGE_TYPE - 1; i++)
+		for (j = HOT; j < NR_TEMP_TYPE; j++)
+			mutex_init(&sbi->wio_mutex[i][j]);
+	init_rwsem(&sbi->io_order_lock);
+	spin_lock_init(&sbi->cp_lock);
+
+	sbi->dirty_device = 0;
+	spin_lock_init(&sbi->dev_lock);
+
+	init_rwsem(&sbi->sb_lock);
+}
+
+static int init_percpu_info(struct f2fs_sb_info *sbi)
+{
+	int err;
+
+	err = percpu_counter_init(&sbi->alloc_valid_block_count, 0, GFP_KERNEL);
+	if (err)
+		return err;
+
+	return percpu_counter_init(&sbi->total_valid_inode_count, 0,
+								GFP_KERNEL);
 }
 
 /*
