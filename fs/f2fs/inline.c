@@ -244,8 +244,7 @@ int f2fs_write_inline_data(struct inode *inode, struct page *page)
 	memcpy(dst_addr, src_addr, MAX_INLINE_DATA);
 	kunmap_atomic(src_addr);
 
-	set_inode_flag(F2FS_I(inode), FI_APPEND_WRITE);
-	set_inode_flag(F2FS_I(inode), FI_DATA_EXIST);
+	clear_radix_tree_dirty_tag(page);
 
 	sync_inode_page(&dn);
 	f2fs_put_dnode(&dn);

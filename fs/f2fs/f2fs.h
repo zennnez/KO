@@ -2108,21 +2108,51 @@ void destroy_checkpoint_caches(void);
 /*
  * data.c
  */
-void f2fs_submit_merged_bio(struct f2fs_sb_info *, enum page_type, int);
-int f2fs_submit_page_bio(struct f2fs_io_info *);
-void f2fs_submit_page_mbio(struct f2fs_io_info *);
-void set_data_blkaddr(struct dnode_of_data *);
-int reserve_new_block(struct dnode_of_data *);
-int f2fs_get_block(struct dnode_of_data *, pgoff_t);
-int f2fs_reserve_block(struct dnode_of_data *, pgoff_t);
-struct page *get_read_data_page(struct inode *, pgoff_t, int, bool);
-struct page *find_data_page(struct inode *, pgoff_t);
-struct page *get_lock_data_page(struct inode *, pgoff_t, bool);
-struct page *get_new_data_page(struct inode *, struct page *, pgoff_t, bool);
-int do_write_data_page(struct f2fs_io_info *);
-int f2fs_fiemap(struct inode *inode, struct fiemap_extent_info *, u64, u64);
-void f2fs_invalidate_page(struct page *, unsigned int, unsigned int);
-int f2fs_release_page(struct page *, gfp_t);
+int f2fs_init_post_read_processing(void);
+void f2fs_destroy_post_read_processing(void);
+void f2fs_submit_merged_write(struct f2fs_sb_info *sbi, enum page_type type);
+void f2fs_submit_merged_write_cond(struct f2fs_sb_info *sbi,
+				struct inode *inode, nid_t ino, pgoff_t idx,
+				enum page_type type);
+void f2fs_flush_merged_writes(struct f2fs_sb_info *sbi);
+int f2fs_submit_page_bio(struct f2fs_io_info *fio);
+int f2fs_submit_page_write(struct f2fs_io_info *fio);
+struct block_device *f2fs_target_device(struct f2fs_sb_info *sbi,
+			block_t blk_addr, struct bio *bio);
+int f2fs_target_device_index(struct f2fs_sb_info *sbi, block_t blkaddr);
+void set_data_blkaddr(struct dnode_of_data *dn);
+void f2fs_update_data_blkaddr(struct dnode_of_data *dn, block_t blkaddr);
+int reserve_new_blocks(struct dnode_of_data *dn, blkcnt_t count);
+int reserve_new_block(struct dnode_of_data *dn);
+int f2fs_get_block(struct dnode_of_data *dn, pgoff_t index);
+int f2fs_preallocate_blocks(struct kiocb *iocb, struct iov_iter *from);
+int f2fs_reserve_block(struct dnode_of_data *dn, pgoff_t index);
+struct page *get_read_data_page(struct inode *inode, pgoff_t index,
+			int op_flags, bool for_write);
+struct page *find_data_page(struct inode *inode, pgoff_t index);
+struct page *get_lock_data_page(struct inode *inode, pgoff_t index,
+			bool for_write);
+struct page *get_new_data_page(struct inode *inode,
+			struct page *ipage, pgoff_t index, bool new_i_size);
+int do_write_data_page(struct f2fs_io_info *fio);
+int f2fs_map_blocks(struct inode *inode, struct f2fs_map_blocks *map,
+			int create, int flag);
+int f2fs_fiemap(struct inode *inode, struct fiemap_extent_info *fieinfo,
+			u64 start, u64 len);
+bool should_update_inplace(struct inode *inode, struct f2fs_io_info *fio);
+bool should_update_outplace(struct inode *inode, struct f2fs_io_info *fio);
+int __f2fs_write_data_pages(struct address_space *mapping,
+						struct writeback_control *wbc,
+						enum iostat_type io_type);
+void f2fs_invalidate_page(struct page *page, unsigned int offset,
+			unsigned int length);
+int f2fs_release_page(struct page *page, gfp_t wait);
+#ifdef CONFIG_MIGRATION
+int f2fs_migrate_page(struct address_space *mapping, struct page *newpage,
+			struct page *page, enum migrate_mode mode);
+#endif
+bool f2fs_overwrite_io(struct inode *inode, loff_t pos, size_t len);
+void clear_radix_tree_dirty_tag(struct page *page);
 
 /*
  * gc.c
