@@ -933,13 +933,10 @@ static int __exchange_data_block(struct inode *inode, pgoff_t src,
 	}
 	return 0;
 
-err_out:
-	if (!get_dnode_of_data(&dn, src, LOOKUP_NODE)) {
-		dn.data_blkaddr = new_addr;
-		set_data_blkaddr(&dn);
-		f2fs_update_extent_cache(&dn);
-		f2fs_put_dnode(&dn);
-	}
+roll_back:
+	__roll_back_blkaddrs(src_inode, src_blkaddr, do_replace, src, olen);
+	kvfree(src_blkaddr);
+	kvfree(do_replace);
 	return ret;
 }
 
