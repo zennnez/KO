@@ -710,8 +710,17 @@ static void move_data_page(struct inode *inode, block_t bidx, int gc_type)
 		if (clear_page_dirty_for_io(page))
 			inode_dec_dirty_pages(inode);
 		set_cold_data(page);
-		do_write_data_page(&fio);
-		clear_cold_data(page);
+
+		err = do_write_data_page(&fio);
+		if (err) {
+			clear_cold_data(page);
+			if (err == -ENOMEM) {
+				congestion_wait(BLK_RW_ASYNC, HZ/50);
+				goto retry;
+			}
+			if (is_dirty)
+				set_page_dirty(page);
+		}
 	}
 out:
 	f2fs_put_page(page, 1);
