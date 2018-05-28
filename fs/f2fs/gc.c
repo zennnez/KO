@@ -561,6 +561,8 @@ static void move_data_block(struct inode *inode, block_t bidx,
 		.type = DATA,
 		.rw = READ_SYNC,
 		.encrypted_page = NULL,
+		.in_list = false,
+		.retry = false,
 	};
 	struct dnode_of_data dn;
 	struct f2fs_summary sum;
@@ -644,16 +646,22 @@ static void move_data_block(struct inode *inode, block_t bidx,
 	set_page_writeback(fio.encrypted_page);
 
 	/* allocate block address */
-	f2fs_wait_on_page_writeback(dn.node_page, NODE);
-	allocate_data_block(fio.sbi, NULL, fio.blk_addr,
-					&fio.blk_addr, &sum, CURSEG_COLD_DATA);
-	fio.rw = WRITE_SYNC;
-	f2fs_submit_page_mbio(&fio);
+	f2fs_wait_on_page_writeback(dn.node_page, NODE, true);
 
-	dn.data_blkaddr = fio.blk_addr;
-	set_data_blkaddr(&dn);
-	f2fs_update_extent_cache(&dn);
-	set_inode_flag(F2FS_I(inode), FI_APPEND_WRITE);
+	fio.op = REQ_OP_WRITE;
+	fio.op_flags = REQ_SYNC | REQ_NOIDLE;
+	fio.new_blkaddr = newaddr;
+	f2fs_submit_page_write(&fio);
+	if (fio.retry) {
+		if (PageWriteback(fio.encrypted_page))
+			end_page_writeback(fio.encrypted_page);
+		goto put_page_out;
+	}
+
+	f2fs_update_iostat(fio.sbi, FS_GC_DATA_IO, F2FS_BLKSIZE);
+
+	f2fs_update_data_blkaddr(&dn, newaddr);
+	set_inode_flag(inode, FI_APPEND_WRITE);
 	if (page->index == 0)
 		set_inode_flag(F2FS_I(inode), FI_FIRST_BLOCK_WRITTEN);
 put_page_out:
