@@ -1304,6 +1304,21 @@ static int f2fs_write_data_page(struct page *page,
 
 	trace_f2fs_writepage(page, DATA);
 
+	/* we should bypass data pages to proceed the kworkder jobs */
+	if (unlikely(f2fs_cp_error(sbi))) {
+		mapping_set_error(page->mapping, -EIO);
+		/*
+		 * don't drop any dirty dentry pages for keeping lastest
+		 * directory structure.
+		 */
+		if (S_ISDIR(inode->i_mode))
+			goto redirty_out;
+		goto out;
+	}
+
+	if (unlikely(is_sbi_flag_set(sbi, SBI_POR_DOING)))
+		goto redirty_out;
+
 	if (page->index < end_index)
 		goto write;
 
