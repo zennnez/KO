@@ -463,7 +463,7 @@ static int f2fs_drop_inode(struct inode *inode)
 
 			/* some remained atomic pages should discarded */
 			if (f2fs_is_atomic_file(inode))
-				commit_inmem_pages(inode, true);
+				f2fs_drop_inmem_pages(inode);
 
 			/* should remain fi->extent_tree for writepage */
 			f2fs_destroy_extent_node(inode);
@@ -535,18 +535,27 @@ static void f2fs_put_super(struct super_block *sb)
 		struct cp_control cpc = {
 			.reason = CP_UMOUNT,
 		};
-		write_checkpoint(sbi, &cpc);
+		f2fs_write_checkpoint(sbi, &cpc);
 	}
 
-	/* write_checkpoint can update stat informaion */
+	/* be sure to wait for any on-going discard commands */
+	dropped = f2fs_wait_discard_bios(sbi);
+
+	if (f2fs_discard_en(sbi) && !sbi->discard_blks && !dropped) {
+		struct cp_control cpc = {
+			.reason = CP_UMOUNT | CP_TRIMMED,
+		};
+		f2fs_write_checkpoint(sbi, &cpc);
+	}
+
+	/* f2fs_write_checkpoint can update stat informaion */
 	f2fs_destroy_stats(sbi);
 
 	/*
 	 * normally superblock is clean, so we need to release this.
 	 * In addition, EIO will skip do checkpoint, we need this as well.
 	 */
-	release_dirty_inode(sbi);
-	release_discard_addrs(sbi);
+	f2fs_release_ino_entry(sbi, true);
 
 	f2fs_leave_shrinker(sbi);
 	mutex_unlock(&sbi->umount_mutex);
@@ -555,8 +564,8 @@ static void f2fs_put_super(struct super_block *sb)
 	iput(sbi->meta_inode);
 
 	/* destroy f2fs internal modules */
-	destroy_node_manager(sbi);
-	destroy_segment_manager(sbi);
+	f2fs_destroy_node_manager(sbi);
+	f2fs_destroy_segment_manager(sbi);
 
 	kfree(sbi->ckpt);
 	kobject_put(&sbi->s_kobj);
@@ -579,7 +588,7 @@ int f2fs_sync_fs(struct super_block *sb, int sync)
 		cpc.reason = __get_cp_reason(sbi);
 
 		mutex_lock(&sbi->gc_mutex);
-		write_checkpoint(sbi, &cpc);
+		err = f2fs_write_checkpoint(sbi, &cpc);
 		mutex_unlock(&sbi->gc_mutex);
 	} else {
 		f2fs_balance_fs(sbi);
@@ -793,12 +802,11 @@ static int f2fs_remount(struct super_block *sb, int *flags, char *data)
 	 */
 	if ((*flags & MS_RDONLY) || !test_opt(sbi, BG_GC)) {
 		if (sbi->gc_thread) {
-			stop_gc_thread(sbi);
-			f2fs_sync_fs(sb, 1);
+			f2fs_stop_gc_thread(sbi);
 			need_restart_gc = true;
 		}
 	} else if (!sbi->gc_thread) {
-		err = start_gc_thread(sbi);
+		err = f2fs_start_gc_thread(sbi);
 		if (err)
 			goto restore_opts;
 		need_stop_gc = true;
@@ -809,9 +817,10 @@ static int f2fs_remount(struct super_block *sb, int *flags, char *data)
 	 * or if flush_merge is not passed in mount option.
 	 */
 	if ((*flags & MS_RDONLY) || !test_opt(sbi, FLUSH_MERGE)) {
-		destroy_flush_cmd_control(sbi);
-	} else if (!SM_I(sbi)->cmd_control_info) {
-		err = create_flush_cmd_control(sbi);
+		clear_opt(sbi, FLUSH_MERGE);
+		f2fs_destroy_flush_cmd_control(sbi, false);
+	} else {
+		err = f2fs_create_flush_cmd_control(sbi);
 		if (err)
 			goto restore_gc;
 	}
@@ -822,11 +831,11 @@ skip:
 	return 0;
 restore_gc:
 	if (need_restart_gc) {
-		if (start_gc_thread(sbi))
+		if (f2fs_start_gc_thread(sbi))
 			f2fs_msg(sbi->sb, KERN_WARNING,
 				"background gc thread has stopped");
 	} else if (need_stop_gc) {
-		stop_gc_thread(sbi);
+		f2fs_stop_gc_thread(sbi);
 	}
 restore_opts:
 #ifdef CONFIG_QUOTA
@@ -1153,7 +1162,7 @@ static struct inode *f2fs_nfs_get_inode(struct super_block *sb,
 	struct f2fs_sb_info *sbi = F2FS_SB(sb);
 	struct inode *inode;
 
-	if (check_nid_range(sbi, ino))
+	if (f2fs_check_nid_range(sbi, ino))
 		return ERR_PTR(-ESTALE);
 
 	/*
@@ -1431,7 +1440,7 @@ static int sanity_check_raw_super(struct super_block *sb,
 	return 0;
 }
 
-static int sanity_check_ckpt(struct f2fs_sb_info *sbi)
+int f2fs_sanity_check_ckpt(struct f2fs_sb_info *sbi)
 {
 	unsigned int total, fsmeta;
 	struct f2fs_super_block *raw_super = F2FS_RAW_SUPER(sbi);
@@ -1715,7 +1724,7 @@ try_onemore:
 		goto free_options;
 	}
 
-	err = get_valid_checkpoint(sbi);
+	err = f2fs_get_valid_checkpoint(sbi);
 	if (err) {
 		f2fs_msg(sb, KERN_ERR, "Failed to get valid F2FS checkpoint");
 		goto free_meta_inode;
@@ -1740,25 +1749,36 @@ try_onemore:
 	INIT_LIST_HEAD(&sbi->dir_inode_list);
 	spin_lock_init(&sbi->dir_inode_lock);
 
-	init_extent_cache_info(sbi);
+	f2fs_init_extent_cache_info(sbi);
 
-	init_ino_entry_info(sbi);
+	f2fs_init_ino_entry_info(sbi);
 
 	/* setup f2fs internal modules */
-	err = build_segment_manager(sbi);
+	err = f2fs_build_segment_manager(sbi);
 	if (err) {
 		f2fs_msg(sb, KERN_ERR,
 			"Failed to initialize F2FS segment manager");
 		goto free_sm;
 	}
-	err = build_node_manager(sbi);
+	err = f2fs_build_node_manager(sbi);
 	if (err) {
 		f2fs_msg(sb, KERN_ERR,
 			"Failed to initialize F2FS node manager");
 		goto free_nm;
 	}
 
-	build_gc_manager(sbi);
+	/* For write statistics */
+	if (sb->s_bdev->bd_part)
+		sbi->sectors_written_start =
+			(u64)part_stat_read(sb->s_bdev->bd_part, sectors[1]);
+
+	/* Read accumulated write IO statistics if exists */
+	seg_i = CURSEG_I(sbi, CURSEG_HOT_NODE);
+	if (__exist_node_summaries(sbi))
+		sbi->kbytes_written =
+			le64_to_cpu(seg_i->journal->info.kbytes_written);
+
+	f2fs_build_gc_manager(sbi);
 
 	/* get an inode for node space */
 	sbi->node_inode = f2fs_iget(sb, F2FS_NODE_INO(sbi));
@@ -1798,17 +1818,22 @@ try_onemore:
 	if (err)
 		goto free_root_inode;
 
-	if (f2fs_proc_root)
-		sbi->s_proc = proc_mkdir(sb->s_id, f2fs_proc_root);
-
-	if (sbi->s_proc)
-		proc_create_data("segment_info", S_IRUGO, sbi->s_proc,
-				 &f2fs_seq_segment_info_fops, sb);
-
-	sbi->s_kobj.kset = f2fs_kset;
-	init_completion(&sbi->s_kobj_unregister);
-	err = kobject_init_and_add(&sbi->s_kobj, &f2fs_ktype, NULL,
-							"%s", sb->s_id);
+#ifdef CONFIG_QUOTA
+	/*
+	 * Turn on quotas which were not enabled for read-only mounts if
+	 * filesystem has quota feature, so that they are updated correctly.
+	 */
+	if (f2fs_sb_has_quota_ino(sb) && !f2fs_readonly(sb)) {
+		err = f2fs_enable_quotas(sb);
+		if (err) {
+			f2fs_msg(sb, KERN_ERR,
+				"Cannot turn on quotas: error %d", err);
+			goto free_sysfs;
+		}
+	}
+#endif
+	/* if there are nt orphan nodes free them */
+	err = f2fs_recover_orphan_inodes(sbi);
 	if (err)
 		goto free_proc;
 
@@ -1827,15 +1852,28 @@ try_onemore:
 		if (need_fsck)
 			set_sbi_flag(sbi, SBI_NEED_FSCK);
 
-		err = recover_fsync_data(sbi);
-		if (err) {
+		if (!retry)
+			goto skip_recovery;
+
+		err = f2fs_recover_fsync_data(sbi, false);
+		if (err < 0) {
 			need_fsck = true;
 			f2fs_msg(sb, KERN_ERR,
-				"Cannot recover all fsync data errno=%ld", err);
-			goto free_kobj;
+				"Cannot recover all fsync data errno=%d", err);
+			goto free_meta;
+		}
+	} else {
+		err = f2fs_recover_fsync_data(sbi, true);
+
+		if (!f2fs_readonly(sb) && err > 0) {
+			err = -EINVAL;
+			f2fs_msg(sb, KERN_ERR,
+				"Need to recover fsync data");
+			goto free_meta;
 		}
 	}
-	/* recover_fsync_data() cleared this already */
+skip_recovery:
+	/* f2fs_recover_fsync_data() cleared this already */
 	clear_sbi_flag(sbi, SBI_POR_DOING);
 
 	/*
@@ -1844,7 +1882,7 @@ try_onemore:
 	 */
 	if (test_opt(sbi, BG_GC) && !f2fs_readonly(sb)) {
 		/* After POR, we can run background GC thread.*/
-		err = start_gc_thread(sbi);
+		err = f2fs_start_gc_thread(sbi);
 		if (err)
 			goto free_kobj;
 	}
@@ -1860,27 +1898,37 @@ try_onemore:
 
 	return 0;
 
-free_kobj:
-	kobject_del(&sbi->s_kobj);
-free_proc:
-	if (sbi->s_proc) {
-		remove_proc_entry("segment_info", sbi->s_proc);
-		remove_proc_entry(sb->s_id, f2fs_proc_root);
-	}
-	f2fs_destroy_stats(sbi);
+free_meta:
+#ifdef CONFIG_QUOTA
+	if (f2fs_sb_has_quota_ino(sb) && !f2fs_readonly(sb))
+		f2fs_quota_off_umount(sbi->sb);
+#endif
+	f2fs_sync_inode_meta(sbi);
+	/*
+	 * Some dirty meta pages can be produced by f2fs_recover_orphan_inodes()
+	 * failed by EIO. Then, iput(node_inode) can trigger balance_fs_bg()
+	 * followed by f2fs_write_checkpoint() through f2fs_write_node_pages(), which
+	 * falls into an infinite loop in f2fs_sync_meta_pages().
+	 */
+	truncate_inode_pages_final(META_MAPPING(sbi));
+#ifdef CONFIG_QUOTA
+free_sysfs:
+#endif
+	f2fs_unregister_sysfs(sbi);
 free_root_inode:
 	dput(sb->s_root);
 	sb->s_root = NULL;
 free_node_inode:
-	mutex_lock(&sbi->umount_mutex);
-	f2fs_leave_shrinker(sbi);
+	f2fs_release_ino_entry(sbi, true);
+	truncate_inode_pages_final(NODE_MAPPING(sbi));
 	iput(sbi->node_inode);
 	mutex_unlock(&sbi->umount_mutex);
 free_nm:
-	destroy_node_manager(sbi);
+	f2fs_destroy_node_manager(sbi);
 free_sm:
-	destroy_segment_manager(sbi);
-free_cp:
+	f2fs_destroy_segment_manager(sbi);
+free_devices:
+	destroy_device_list(sbi);
 	kfree(sbi->ckpt);
 free_meta_inode:
 	make_bad_inode(sbi->meta_inode);
@@ -1911,6 +1959,9 @@ static void kill_f2fs_super(struct super_block *sb)
 {
 	if (sb->s_root)
 		set_sbi_flag(F2FS_SB(sb), SBI_IS_CLOSE);
+		f2fs_stop_gc_thread(F2FS_SB(sb));
+		f2fs_stop_discard_thread(F2FS_SB(sb));
+	}
 	kill_block_super(sb);
 }
 
@@ -1957,16 +2008,16 @@ static int __init init_f2fs_fs(void)
 	err = init_inodecache();
 	if (err)
 		goto fail;
-	err = create_node_manager_caches();
+	err = f2fs_create_node_manager_caches();
 	if (err)
 		goto free_inodecache;
-	err = create_segment_manager_caches();
+	err = f2fs_create_segment_manager_caches();
 	if (err)
 		goto free_node_manager_caches;
-	err = create_checkpoint_caches();
+	err = f2fs_create_checkpoint_caches();
 	if (err)
 		goto free_segment_manager_caches;
-	err = create_extent_cache();
+	err = f2fs_create_extent_cache();
 	if (err)
 		goto free_checkpoint_caches;
 	f2fs_kset = kset_create_and_add("f2fs", NULL, fs_kobj);
@@ -1996,13 +2047,13 @@ free_crypto:
 free_kset:
 	kset_unregister(f2fs_kset);
 free_extent_cache:
-	destroy_extent_cache();
+	f2fs_destroy_extent_cache();
 free_checkpoint_caches:
-	destroy_checkpoint_caches();
+	f2fs_destroy_checkpoint_caches();
 free_segment_manager_caches:
-	destroy_segment_manager_caches();
+	f2fs_destroy_segment_manager_caches();
 free_node_manager_caches:
-	destroy_node_manager_caches();
+	f2fs_destroy_node_manager_caches();
 free_inodecache:
 	destroy_inodecache();
 fail:
@@ -2014,12 +2065,11 @@ static void __exit exit_f2fs_fs(void)
 	remove_proc_entry("fs/f2fs", NULL);
 	f2fs_destroy_root_stats();
 	unregister_shrinker(&f2fs_shrinker_info);
-	unregister_filesystem(&f2fs_fs_type);
-	f2fs_exit_crypto();
-	destroy_extent_cache();
-	destroy_checkpoint_caches();
-	destroy_segment_manager_caches();
-	destroy_node_manager_caches();
+	f2fs_exit_sysfs();
+	f2fs_destroy_extent_cache();
+	f2fs_destroy_checkpoint_caches();
+	f2fs_destroy_segment_manager_caches();
+	f2fs_destroy_node_manager_caches();
 	destroy_inodecache();
 	kset_unregister(f2fs_kset);
 	f2fs_destroy_trace_ios();
