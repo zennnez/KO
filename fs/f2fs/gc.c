@@ -419,11 +419,16 @@ static int gc_node_segment(struct f2fs_sb_info *sbi,
 	struct f2fs_summary *entry;
 	block_t start_addr;
 	int off;
+	int phase = 0;
+	bool fggc = (gc_type == FG_GC);
 
 	start_addr = START_BLOCK(sbi, segno);
 
 next_step:
 	entry = sum;
+
+	if (fggc && phase == 2)
+		atomic_inc(&sbi->wb_sync_req[NODE]);
 
 	for (off = 0; off < sbi->blocks_per_seg; off++, entry++) {
 		nid_t nid = le32_to_cpu(entry->nid);
@@ -472,21 +477,9 @@ next_step:
 	if (initial) {
 		initial = false;
 		goto next_step;
-	}
 
-	if (gc_type == FG_GC) {
-		struct writeback_control wbc = {
-			.sync_mode = WB_SYNC_ALL,
-			.nr_to_write = LONG_MAX,
-			.for_reclaim = 0,
-		};
-		sync_node_pages(sbi, 0, &wbc);
-
-		/* return 1 only if FG_GC succefully reclaimed one */
-		if (get_valid_blocks(sbi, segno, 1) == 0)
-			return 1;
-	}
-	return 0;
+	if (fggc)
+		atomic_dec(&sbi->wb_sync_req[NODE]);
 }
 
 /*

@@ -1635,6 +1635,7 @@ static int f2fs_write_cache_pages(struct address_space *mapping,
 	int ret = 0;
 	int done = 0;
 	struct pagevec pvec;
+	struct f2fs_sb_info *sbi = F2FS_M_SB(mapping);
 	int nr_pages;
 	pgoff_t uninitialized_var(writeback_index);
 	pgoff_t index;
@@ -1682,7 +1683,7 @@ retry:
 			struct page *page = pvec.pages[i];
 
 			/* give a priority to WB_SYNC threads */
-			if (atomic_read(&F2FS_M_SB(mapping)->wb_sync_req) &&
+			if (atomic_read(&sbi->wb_sync_req[DATA]) &&
 					wbc->sync_mode == WB_SYNC_NONE) {
 				done = 1;
 				break;
@@ -1787,16 +1788,22 @@ static int __f2fs_write_data_pages(struct address_space *mapping,
 
 	diff = nr_pages_to_write(sbi, DATA, wbc);
 
-	if (!S_ISDIR(inode->i_mode)) {
-		mutex_lock(&sbi->writepages);
-		locked = true;
-	}
-	ret = f2fs_write_cache_pages(mapping, wbc, __f2fs_writepage, mapping);
-	f2fs_submit_merged_bio(sbi, DATA, WRITE);
-	if (locked)
-		mutex_unlock(&sbi->writepages);
+	/* to avoid spliting IOs due to mixed WB_SYNC_ALL and WB_SYNC_NONE */
+	if (wbc->sync_mode == WB_SYNC_ALL)
+		atomic_inc(&sbi->wb_sync_req[DATA]);
+	else if (atomic_read(&sbi->wb_sync_req[DATA]))
+		goto skip_write;
 
-	remove_dirty_dir_inode(inode);
+	blk_start_plug(&plug);
+	ret = f2fs_write_cache_pages(mapping, wbc, io_type);
+	blk_finish_plug(&plug);
+
+	if (wbc->sync_mode == WB_SYNC_ALL)
+		atomic_dec(&sbi->wb_sync_req[DATA]);
+	/*
+	 * if some pages were truncated, we cannot guarantee its mapping->host
+	 * to detect pending bios.
+	 */
 
 	f2fs_remove_dirty_inode(inode);
 	return ret;
