@@ -1743,7 +1743,6 @@ static int f2fs_write_node_pages(struct address_space *mapping,
 		goto skip_write;
 
 	diff = nr_pages_to_write(sbi, NODE, wbc);
-	wbc->sync_mode = WB_SYNC_NONE;
 	blk_start_plug(&plug);
 	f2fs_sync_node_pages(sbi, wbc, true, FS_NODE_IO);
 	blk_finish_plug(&plug);
