@@ -1022,20 +1022,18 @@ static int __roll_back_blkaddrs(struct inode *inode, block_t *blkaddr,
 
 		truncate_data_blocks_range(&dn, 1);
 
-		get_node_info(sbi, dn.nid, &ni);
-		f2fs_replace_block(sbi, &dn, dn.data_blkaddr, new_addr,
-				ni.version, true);
-		f2fs_put_dnode(&dn);
-	} else {
-		struct page *psrc, *pdst;
+		src_blkaddr = f2fs_kvzalloc(F2FS_I_SB(src_inode),
+					array_size(olen, sizeof(block_t)),
+					GFP_KERNEL);
+		if (!src_blkaddr)
+			return -ENOMEM;
 
-		psrc = get_lock_data_page(inode, src, true);
-		if (IS_ERR(psrc))
-			return PTR_ERR(psrc);
-		pdst = get_new_data_page(inode, NULL, dst, false);
-		if (IS_ERR(pdst)) {
-			f2fs_put_page(psrc, 1);
-			return PTR_ERR(pdst);
+		do_replace = f2fs_kvzalloc(F2FS_I_SB(src_inode),
+					array_size(olen, sizeof(int)),
+					GFP_KERNEL);
+		if (!do_replace) {
+			kvfree(src_blkaddr);
+			return -ENOMEM;
 		}
 		f2fs_copy_page(psrc, pdst);
 		set_page_dirty(pdst);
