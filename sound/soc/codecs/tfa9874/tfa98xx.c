@@ -1562,9 +1562,9 @@ static int tfa98xx_create_controls(struct tfa98xx *tfa98xx)
 			nr_controls++; /* Playback Volume control */
 	}
 
-	tfa98xx_controls = devm_kzalloc(tfa98xx->codec->dev,
-			nr_controls * sizeof(tfa98xx_controls[0]), GFP_KERNEL);
-	if (!tfa98xx_controls)
+	tfa98xx_controls = devm_kcalloc(tfa98xx->codec->dev,
+			nvols + 1, sizeof(tfa98xx_controls[0]), GFP_KERNEL);
+	if(!tfa98xx_controls)
 		return -ENOMEM;
 
 	/* Create a mixer item for selecting the active profile */
@@ -1788,9 +1788,9 @@ static void tfa98xx_add_widgets(struct tfa98xx *tfa98xx)
 	struct snd_soc_dapm_widget *widgets;
 	unsigned int num_dapm_widgets = ARRAY_SIZE(tfa98xx_dapm_widgets_common);
 
-	widgets = devm_kzalloc(&tfa98xx->i2c->dev,
-			sizeof(struct snd_soc_dapm_widget) *
-				ARRAY_SIZE(tfa98xx_dapm_widgets_common),
+	widgets = devm_kcalloc(&tfa98xx->i2c->dev,
+			ARRAY_SIZE(tfa98xx_dapm_widgets_common),
+			sizeof(struct snd_soc_dapm_widget),
 			GFP_KERNEL);
 	if (!widgets)
 		return;
