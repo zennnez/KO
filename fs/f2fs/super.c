@@ -1534,6 +1534,74 @@ static int init_percpu_info(struct f2fs_sb_info *sbi)
 								GFP_KERNEL);
 }
 
+#ifdef CONFIG_BLK_DEV_ZONED
+static int init_blkz_info(struct f2fs_sb_info *sbi, int devi)
+{
+	struct block_device *bdev = FDEV(devi).bdev;
+	sector_t nr_sectors = bdev->bd_part->nr_sects;
+	sector_t sector = 0;
+	struct blk_zone *zones;
+	unsigned int i, nr_zones;
+	unsigned int n = 0;
+	int err = -EIO;
+
+	if (!f2fs_sb_has_blkzoned(sbi->sb))
+		return 0;
+
+	if (sbi->blocks_per_blkz && sbi->blocks_per_blkz !=
+				SECTOR_TO_BLOCK(bdev_zone_sectors(bdev)))
+		return -EINVAL;
+	sbi->blocks_per_blkz = SECTOR_TO_BLOCK(bdev_zone_sectors(bdev));
+	if (sbi->log_blocks_per_blkz && sbi->log_blocks_per_blkz !=
+				__ilog2_u32(sbi->blocks_per_blkz))
+		return -EINVAL;
+	sbi->log_blocks_per_blkz = __ilog2_u32(sbi->blocks_per_blkz);
+	FDEV(devi).nr_blkz = SECTOR_TO_BLOCK(nr_sectors) >>
+					sbi->log_blocks_per_blkz;
+	if (nr_sectors & (bdev_zone_sectors(bdev) - 1))
+		FDEV(devi).nr_blkz++;
+
+	FDEV(devi).blkz_type = f2fs_kmalloc(sbi, FDEV(devi).nr_blkz,
+								GFP_KERNEL);
+	if (!FDEV(devi).blkz_type)
+		return -ENOMEM;
+
+#define F2FS_REPORT_NR_ZONES   4096
+
+	zones = f2fs_kzalloc(sbi,
+			     array_size(F2FS_REPORT_NR_ZONES,
+					sizeof(struct blk_zone)),
+			     GFP_KERNEL);
+	if (!zones)
+		return -ENOMEM;
+
+	/* Get block zones type */
+	while (zones && sector < nr_sectors) {
+
+		nr_zones = F2FS_REPORT_NR_ZONES;
+		err = blkdev_report_zones(bdev, sector,
+					  zones, &nr_zones,
+					  GFP_KERNEL);
+		if (err)
+			break;
+		if (!nr_zones) {
+			err = -EIO;
+			break;
+		}
+
+		for (i = 0; i < nr_zones; i++) {
+			FDEV(devi).blkz_type[n] = zones[i].type;
+			sector += zones[i].len;
+			n++;
+		}
+	}
+
+	kfree(zones);
+
+	return err;
+}
+#endif
+
 /*
  * Read f2fs raw super block.
  * Because we have two copies of super block, so read the first one at first,
@@ -1629,6 +1697,118 @@ out:
 	clear_buffer_write_io_error(sbh);
 	set_buffer_uptodate(sbh);
 	return err;
+}
+
+static int f2fs_scan_devices(struct f2fs_sb_info *sbi)
+{
+	struct f2fs_super_block *raw_super = F2FS_RAW_SUPER(sbi);
+	unsigned int max_devices = MAX_DEVICES;
+	int i;
+
+	/* Initialize single device information */
+	if (!RDEV(0).path[0]) {
+#ifdef CONFIG_BLK_DEV_ZONED
+		if (!bdev_is_zoned(sbi->sb->s_bdev))
+			return 0;
+		max_devices = 1;
+#else
+		return 0;
+#endif
+	}
+
+	/*
+	 * Initialize multiple devices information, or single
+	 * zoned block device information.
+	 */
+	sbi->devs = f2fs_kzalloc(sbi,
+				 array_size(max_devices,
+					    sizeof(struct f2fs_dev_info)),
+				 GFP_KERNEL);
+	if (!sbi->devs)
+		return -ENOMEM;
+
+	for (i = 0; i < max_devices; i++) {
+
+		if (i > 0 && !RDEV(i).path[0])
+			break;
+
+		if (max_devices == 1) {
+			/* Single zoned block device mount */
+			FDEV(0).bdev =
+				blkdev_get_by_dev(sbi->sb->s_bdev->bd_dev,
+					sbi->sb->s_mode, sbi->sb->s_type);
+		} else {
+			/* Multi-device mount */
+			memcpy(FDEV(i).path, RDEV(i).path, MAX_PATH_LEN);
+			FDEV(i).total_segments =
+				le32_to_cpu(RDEV(i).total_segments);
+			if (i == 0) {
+				FDEV(i).start_blk = 0;
+				FDEV(i).end_blk = FDEV(i).start_blk +
+				    (FDEV(i).total_segments <<
+				    sbi->log_blocks_per_seg) - 1 +
+				    le32_to_cpu(raw_super->segment0_blkaddr);
+			} else {
+				FDEV(i).start_blk = FDEV(i - 1).end_blk + 1;
+				FDEV(i).end_blk = FDEV(i).start_blk +
+					(FDEV(i).total_segments <<
+					sbi->log_blocks_per_seg) - 1;
+			}
+			FDEV(i).bdev = blkdev_get_by_path(FDEV(i).path,
+					sbi->sb->s_mode, sbi->sb->s_type);
+		}
+		if (IS_ERR(FDEV(i).bdev))
+			return PTR_ERR(FDEV(i).bdev);
+
+		/* to release errored devices */
+		sbi->s_ndevs = i + 1;
+
+#ifdef CONFIG_BLK_DEV_ZONED
+		if (bdev_zoned_model(FDEV(i).bdev) == BLK_ZONED_HM &&
+				!f2fs_sb_has_blkzoned(sbi->sb)) {
+			f2fs_msg(sbi->sb, KERN_ERR,
+				"Zoned block device feature not enabled\n");
+			return -EINVAL;
+		}
+		if (bdev_zoned_model(FDEV(i).bdev) != BLK_ZONED_NONE) {
+			if (init_blkz_info(sbi, i)) {
+				f2fs_msg(sbi->sb, KERN_ERR,
+					"Failed to initialize F2FS blkzone information");
+				return -EINVAL;
+			}
+			if (max_devices == 1)
+				break;
+			f2fs_msg(sbi->sb, KERN_INFO,
+				"Mount Device [%2d]: %20s, %8u, %8x - %8x (zone: %s)",
+				i, FDEV(i).path,
+				FDEV(i).total_segments,
+				FDEV(i).start_blk, FDEV(i).end_blk,
+				bdev_zoned_model(FDEV(i).bdev) == BLK_ZONED_HA ?
+				"Host-aware" : "Host-managed");
+			continue;
+		}
+#endif
+		f2fs_msg(sbi->sb, KERN_INFO,
+			"Mount Device [%2d]: %20s, %8u, %8x - %8x",
+				i, FDEV(i).path,
+				FDEV(i).total_segments,
+				FDEV(i).start_blk, FDEV(i).end_blk);
+	}
+	f2fs_msg(sbi->sb, KERN_INFO,
+			"IO Block Size: %8d KB", F2FS_IO_SIZE_KB(sbi));
+	return 0;
+}
+
+static void f2fs_tuning_parameters(struct f2fs_sb_info *sbi)
+{
+	struct f2fs_sm_info *sm_i = SM_I(sbi);
+
+	/* adjust parameters according to the volume size */
+	if (sm_i->main_segments <= SMALL_VOLUME_SEGMENTS) {
+		F2FS_OPTION(sbi).alloc_mode = ALLOC_MODE_REUSE;
+		sm_i->dcc_info->discard_granularity = 1;
+		sm_i->ipu_policy = 1 << F2FS_IPU_FORCE;
+	}
 }
 
 static int f2fs_fill_super(struct super_block *sb, void *data, int silent)
