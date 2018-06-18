@@ -1021,7 +1021,6 @@ static int cpufreq_governor_nightmare(struct cpufreq_policy *policy,
 		policy->governor_data = tunables;
 		if (!have_governor_per_policy()) {
 			common_tunables = tunables;
-			WARN_ON(cpufreq_get_global_kobject());
 		}
 
 		rc = sysfs_create_group(get_governor_parent_kobj(policy),
@@ -1031,7 +1030,6 @@ static int cpufreq_governor_nightmare(struct cpufreq_policy *policy,
 			policy->governor_data = NULL;
 			if (!have_governor_per_policy()) {
 				common_tunables = NULL;
-				cpufreq_put_global_kobject();
 			}
 			return rc;
 		}
@@ -1056,8 +1054,6 @@ static int cpufreq_governor_nightmare(struct cpufreq_policy *policy,
 			sysfs_remove_group(get_governor_parent_kobj(policy),
 					get_sysfs_attr());
 
-			if (!have_governor_per_policy())
-				cpufreq_put_global_kobject();
 			common_tunables = NULL;
 		}
 
