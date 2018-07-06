@@ -110,8 +110,15 @@ static void f2fs_write_end_io(struct bio *bio)
 		if (unlikely(bio->bi_error)) {
 			set_page_dirty(page);
 			set_bit(AS_EIO, &page->mapping->flags);
-			f2fs_stop_checkpoint(sbi);
+			if (WB_DATA_TYPE(page) == F2FS_WB_CP_DATA)
+				f2fs_stop_checkpoint(sbi, true);
 		}
+
+		f2fs_bug_on(sbi, page->mapping == NODE_MAPPING(sbi) &&
+					page->index != nid_of_node(page));
+
+		dec_page_count(sbi, WB_DATA_TYPE(page));
+		clear_cold_data(page);
 		end_page_writeback(page);
 		dec_page_count(sbi, F2FS_WRITEBACK);
 	}
