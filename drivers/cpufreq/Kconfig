@@ -209,6 +209,15 @@ config CPU_FREQ_DEFAULT_GOV_IRONACTIVE
 	  Use the CPUFreq governor 'ironactive' as default. This cpugovernor
 	  is based on the 'interactive' governor with many changes made by CAF.
 
+config CPU_FREQ_DEFAULT_GOV_CAFACTIVE
+	bool "cafactive"
+	select CPU_FREQ_GOV_CAFACTIVE
+	help
+	  Use the CPUFreq governor 'cafactive' as default. This allows
+	  you to get a full dynamic cpu frequency capable system by simply
+	  loading your cpufreq low-level hardware driver, using the
+	  'cafactive' governor for latency-sensitive workloads.
+
 endchoice
 
 config CPU_FREQ_GOV_PERFORMANCE
@@ -457,6 +466,26 @@ config CPU_FREQ_GOV_IRONACTIVE
 
 	  If in doubt, say N.
 
+<<<<<<< HEAD
+=======
+config CPU_FREQ_GOV_CULTIVATION
+	tristate "'cultivation' cpufreq governor"
+	depends on CPU_FREQ
+	help
+	  'cultivation' - another tuned interactive with extra options
+
+config CPU_FREQ_GOV_CAFACTIVE
+	tristate "'cafactive' cpufreq policy governor"
+	help
+	  'cafactive' - CodeAurora(Qualcomm) version of interactive
+	  cpufreq policy governor.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called cpufreq_cafactive.
+
+	  If in doubt, say N.
+
+>>>>>>> 7f83bbd... cpufreq: Add Cafactive governor
 config CPU_BOOST
 	tristate "Event base short term CPU freq boost"
 	depends on CPU_FREQ
