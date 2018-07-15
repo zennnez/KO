@@ -935,7 +935,7 @@ config MSM_CACHE_M4M_ERP64
 config STATE_NOTIFIER
         bool "State Notifier"
 
-source "drivers/soc/qcom/memshare/Kconfig"
+
 
 config MSM_CACHE_M4M_ERP64_PANIC_ON_CE
        bool "Panic on correctable cache/M4M errors"
