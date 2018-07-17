@@ -3,7 +3,7 @@
 
 ## AnyKernel setup
 # begin properties
-properties() {
+properties() { 
 kernel.string=AnyKernel2 by osm0sis @ xda-developers
 do.devicecheck=1
 do.modules=0
@@ -26,8 +26,20 @@ ramdisk_compression=auto;
 # import patching functions/variables - see for reference
 . /tmp/anykernel/tools/ak2-core.sh;
 
+
+## AnyKernel file attributes
+# set permissions/ownership for included ramdisk files
+chmod -R 750 $ramdisk/*;
+chmod -R 755 $ramdisk/sbin;
+chown -R root:root $ramdisk/*;
+
+
 ## AnyKernel install
 dump_boot;
+
+# begin ramdisk changes
+
+# end ramdisk changes
 
 write_boot;
 
