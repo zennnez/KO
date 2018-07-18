@@ -647,7 +647,7 @@
 		qcom,us-euro-gpios = <&us_euro_gpio>;
 		qcom,hph-en0-gpio = <&tasha_hph_en0>;
 		qcom,hph-en1-gpio = <&tasha_hph_en1>;
-		qcom,msm-mclk-freq = <9600000>;
+		qcom,msm-mclk-freq = <12288000>;
 		asoc-platform = <&pcm0>, <&pcm1>, <&pcm2>, <&voip>, <&voice>,
 				<&loopback>, <&compress>, <&hostless>,
 				<&afe>, <&lsm>, <&routing>, <&cpe>, <&compr>,
@@ -751,7 +751,7 @@
 		qcom,us-euro-gpios = <&tavil_us_euro_sw>;
 		qcom,hph-en0-gpio = <&tavil_hph_en0>;
 		qcom,hph-en1-gpio = <&tavil_hph_en1>;
-		qcom,msm-mclk-freq = <9600000>;
+		qcom,msm-mclk-freq = <12288000>;
 		qcom,usbc-analog-en1_gpio = <&wcd_usbc_analog_en1_gpio>;
 		qcom,usbc-analog-en2_n_gpio = <&wcd_usbc_analog_en2n_gpio>;
 		asoc-platform = <&pcm0>, <&pcm1>, <&pcm2>, <&voip>, <&voice>,
@@ -825,7 +825,7 @@
 		qcom,auxpcm-audio-intf;
 		qcom,ext-disp-audio-rx;
 		qcom,msm-mi2s-master = <1>, <1>, <1>, <1>;
-		qcom,msm-mclk-freq = <9600000>;
+		qcom,msm-mclk-freq = <12288000>;
 		qcom,msm-mbhc-hphl-swh = <1>;
 		qcom,msm-mbhc-gnd-swh = <1>;
 		/* Huaqin add for change hp micbias to int by xudayi at 2018/03/05  start */
