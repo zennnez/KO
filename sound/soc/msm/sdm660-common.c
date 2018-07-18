@@ -28,7 +28,7 @@
 #define PMIC_INT_ANALOG_CODEC "analog-codec"
 
 #define DEV_NAME_STR_LEN  32
-#define DEFAULT_MCLK_RATE 9600000
+#define DEFAULT_MCLK_RATE 12288000
 
 /* Huaqin add sar switcher by chenyijun5 at 2018/03/20 start*/
 extern void sar_switch(bool);
