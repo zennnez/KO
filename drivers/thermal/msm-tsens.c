@@ -845,7 +845,7 @@ static int msm_tsens_get_temp(int sensor_client_id, int *temp)
 
 	tmdev->sensor[sensor_hw_num].dbg_adc_code = last_temp;
 
-	trace_tsens_read(*temp, sensor_client_id);
+	//trace_tsens_read(*temp, sensor_client_id);
 
 	return 0;
 }
@@ -1978,16 +1978,16 @@ static irqreturn_t tsens_tm_irq_thread(int irq, void *data)
 				tm->sensor[i].sensor_client_id,
 				(status & TSENS_TM_SN_LAST_TEMP_MASK));
 			if (upper_thr) {
-				trace_tsens_threshold_hit(
-					TSENS_TM_UPPER_THRESHOLD_VALUE(
-						threshold),
-					tm->sensor[i].sensor_client_id);
+				//trace_tsens_threshold_hit(
+				//	TSENS_TM_UPPER_THRESHOLD_VALUE(
+				//		threshold),
+				//	tm->sensor[i].sensor_client_id);
 				tm->tsens_upper_irq_cnt++;
 			} else {
-				trace_tsens_threshold_clear(
-					TSENS_TM_LOWER_THRESHOLD_VALUE(
-						threshold),
-					tm->sensor[i].sensor_client_id);
+				//trace_tsens_threshold_clear(
+				//	TSENS_TM_LOWER_THRESHOLD_VALUE(
+				//		threshold),
+				//	tm->sensor[i].sensor_client_id);
 				tm->tsens_lower_irq_cnt++;
 			}
 		}
@@ -2057,19 +2057,19 @@ static irqreturn_t tsens_irq_thread(int irq, void *data)
 				tsens_tz_code_to_degc((status &
 				TSENS_SN_STATUS_TEMP_MASK),
 				tm->sensor[i].sensor_sw_id, tm));
-			if (upper_thr)
-				trace_tsens_threshold_hit(
-					tsens_tz_code_to_degc((threshold &
-					TSENS_UPPER_THRESHOLD_MASK) >>
-					TSENS_UPPER_THRESHOLD_SHIFT,
-					sensor_sw_id, tm),
-					tm->sensor[i].sensor_hw_num);
-			else
-				trace_tsens_threshold_clear(
-					tsens_tz_code_to_degc((threshold &
-					TSENS_LOWER_THRESHOLD_MASK),
-					sensor_sw_id, tm),
-					tm->sensor[i].sensor_hw_num);
+			//if (upper_thr)
+				//trace_tsens_threshold_hit(
+				//	tsens_tz_code_to_degc((threshold &
+				//	TSENS_UPPER_THRESHOLD_MASK) >>
+				//	TSENS_UPPER_THRESHOLD_SHIFT,
+				//	sensor_sw_id, tm),
+				//	tm->sensor[i].sensor_hw_num);
+			//else
+				//trace_tsens_threshold_clear(
+				//	tsens_tz_code_to_degc((threshold &
+				//	TSENS_LOWER_THRESHOLD_MASK),
+				//	sensor_sw_id, tm),
+				//	tm->sensor[i].sensor_hw_num);
 		}
 	}
 	/* debug */
