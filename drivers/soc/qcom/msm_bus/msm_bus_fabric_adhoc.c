@@ -50,13 +50,13 @@ ssize_t bw_show(struct device *dev, struct device_attribute *attr,
 			bus_node->lnode_list[i].lnode_ab[ACTIVE_CTX],
 			bus_node->lnode_list[i].lnode_ib[DUAL_CTX],
 			bus_node->lnode_list[i].lnode_ab[DUAL_CTX]);
-		trace_printk(
-		"[%d]:%s:Act_IB %llu Act_AB %llu Slp_IB %llu Slp_AB %llu\n",
-			i, bus_node->lnode_list[i].cl_name,
-			bus_node->lnode_list[i].lnode_ib[ACTIVE_CTX],
-			bus_node->lnode_list[i].lnode_ab[ACTIVE_CTX],
-			bus_node->lnode_list[i].lnode_ib[DUAL_CTX],
-			bus_node->lnode_list[i].lnode_ab[DUAL_CTX]);
+		//trace_printk(
+		//"[%d]:%s:Act_IB %llu Act_AB %llu Slp_IB %llu Slp_AB %llu\n",
+		//	i, bus_node->lnode_list[i].cl_name,
+		//	bus_node->lnode_list[i].lnode_ib[ACTIVE_CTX],
+		//	bus_node->lnode_list[i].lnode_ab[ACTIVE_CTX],
+		//	bus_node->lnode_list[i].lnode_ib[DUAL_CTX],
+		//	bus_node->lnode_list[i].lnode_ab[DUAL_CTX]);
 	}
 	off += scnprintf((buf + off), PAGE_SIZE,
 	"Max_Act_IB %llu Sum_Act_AB %llu Act_Util_fact %d Act_Vrail_comp %d\n",
@@ -70,18 +70,18 @@ ssize_t bw_show(struct device *dev, struct device_attribute *attr,
 		bus_node->node_bw[DUAL_CTX].sum_ab,
 		bus_node->node_bw[DUAL_CTX].util_used,
 		bus_node->node_bw[DUAL_CTX].vrail_used);
-	trace_printk(
-	"Max_Act_IB %llu Sum_Act_AB %llu Act_Util_fact %d Act_Vrail_comp %d\n",
-		bus_node->node_bw[ACTIVE_CTX].max_ib,
-		bus_node->node_bw[ACTIVE_CTX].sum_ab,
-		bus_node->node_bw[ACTIVE_CTX].util_used,
-		bus_node->node_bw[ACTIVE_CTX].vrail_used);
-	trace_printk(
-	"Max_Slp_IB %llu Sum_Slp_AB %lluSlp_Util_fact %d Slp_Vrail_comp %d\n",
-		bus_node->node_bw[DUAL_CTX].max_ib,
-		bus_node->node_bw[DUAL_CTX].sum_ab,
-		bus_node->node_bw[DUAL_CTX].util_used,
-		bus_node->node_bw[DUAL_CTX].vrail_used);
+	//trace_printk(
+	//"Max_Act_IB %llu Sum_Act_AB %llu Act_Util_fact %d Act_Vrail_comp %d\n",
+	//	bus_node->node_bw[ACTIVE_CTX].max_ib,
+	//	bus_node->node_bw[ACTIVE_CTX].sum_ab,
+	//	bus_node->node_bw[ACTIVE_CTX].util_used,
+	//	bus_node->node_bw[ACTIVE_CTX].vrail_used);
+	//trace_printk(
+	//"Max_Slp_IB %llu Sum_Slp_AB %lluSlp_Util_fact %d Slp_Vrail_comp %d\n",
+	//	bus_node->node_bw[DUAL_CTX].max_ib,
+	//	bus_node->node_bw[DUAL_CTX].sum_ab,
+	//	bus_node->node_bw[DUAL_CTX].util_used,
+	//	bus_node->node_bw[DUAL_CTX].vrail_used);
 	return off;
 }
 
@@ -272,9 +272,9 @@ static int send_rpm_msg(struct msm_bus_node_device_type *ndev, int ctx)
 				 ndev->node_info->mas_rpm_id);
 			goto exit_send_rpm_msg;
 		}
-		trace_bus_agg_bw(ndev->node_info->id,
-			ndev->node_info->mas_rpm_id, rpm_ctx,
-			ndev->node_bw[ctx].sum_ab);
+		//trace_bus_agg_bw(ndev->node_info->id,
+		//	ndev->node_info->mas_rpm_id, rpm_ctx,
+		//	ndev->node_bw[ctx].sum_ab);
 	}
 
 	if (ndev->node_info->slv_rpm_id != -1) {
@@ -289,9 +289,9 @@ static int send_rpm_msg(struct msm_bus_node_device_type *ndev, int ctx)
 				ndev->node_info->slv_rpm_id);
 			goto exit_send_rpm_msg;
 		}
-		trace_bus_agg_bw(ndev->node_info->id,
-			ndev->node_info->slv_rpm_id, rpm_ctx,
-			ndev->node_bw[ctx].sum_ab);
+		//trace_bus_agg_bw(ndev->node_info->id,
+		//	ndev->node_info->slv_rpm_id, rpm_ctx,
+		//	ndev->node_bw[ctx].sum_ab);
 	}
 exit_send_rpm_msg:
 	return ret;
