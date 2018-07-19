@@ -32,24 +32,24 @@ struct rcu_ctrlblk {
 	struct rcu_head *rcucblist;	/* List of pending callbacks (CBs). */
 	struct rcu_head **donetail;	/* ->next pointer of last "done" CB. */
 	struct rcu_head **curtail;	/* ->next pointer of last CB. */
-	RCU_TRACE(long qlen);		/* Number of pending CBs. */
-	RCU_TRACE(unsigned long gp_start); /* Start time for stalls. */
-	RCU_TRACE(unsigned long ticks_this_gp); /* Statistic for stalls. */
-	RCU_TRACE(unsigned long jiffies_stall); /* Jiffies at next stall. */
-	RCU_TRACE(const char *name);	/* Name of RCU type. */
+	//RCU_TRACE(long qlen);		/* Number of pending CBs. */
+	//RCU_TRACE(unsigned long gp_start); /* Start time for stalls. */
+	//RCU_TRACE(unsigned long ticks_this_gp); /* Statistic for stalls. */
+	//RCU_TRACE(unsigned long jiffies_stall); /* Jiffies at next stall. */
+	//RCU_TRACE(const char *name);	/* Name of RCU type. */
 };
 
 /* Definition for rcupdate control block. */
 static struct rcu_ctrlblk rcu_sched_ctrlblk = {
 	.donetail	= &rcu_sched_ctrlblk.rcucblist,
 	.curtail	= &rcu_sched_ctrlblk.rcucblist,
-	RCU_TRACE(.name = "rcu_sched")
+	//RCU_TRACE(.name = "rcu_sched")
 };
 
 static struct rcu_ctrlblk rcu_bh_ctrlblk = {
 	.donetail	= &rcu_bh_ctrlblk.rcucblist,
 	.curtail	= &rcu_bh_ctrlblk.rcucblist,
-	RCU_TRACE(.name = "rcu_bh")
+	//RCU_TRACE(.name = "rcu_bh")
 };
 
 #ifdef CONFIG_DEBUG_LOCK_ALLOC
@@ -166,10 +166,10 @@ static void reset_cpu_stall_ticks(struct rcu_ctrlblk *rcp)
 		   jiffies + rcu_jiffies_till_stall_check());
 }
 
-static void check_cpu_stalls(void)
-{
-	RCU_TRACE(check_cpu_stall(&rcu_bh_ctrlblk));
-	RCU_TRACE(check_cpu_stall(&rcu_sched_ctrlblk));
-}
+//static void check_cpu_stalls(void)
+//{
+//	RCU_TRACE(check_cpu_stall(&rcu_bh_ctrlblk));
+//	RCU_TRACE(check_cpu_stall(&rcu_sched_ctrlblk));
+//}
 
 #endif /* #ifdef CONFIG_RCU_TRACE */

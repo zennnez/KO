@@ -1493,13 +1493,13 @@ static unsigned long rcu_cbs_completed(struct rcu_state *rsp,
  * Trace-event helper function for rcu_start_future_gp() and
  * rcu_nocb_wait_gp().
  */
-static void trace_rcu_future_gp(struct rcu_node *rnp, struct rcu_data *rdp,
-				unsigned long c, const char *s)
-{
+//static void trace_rcu_future_gp(struct rcu_node *rnp, struct rcu_data *rdp,
+//				unsigned long c, const char *s)
+//{
 	//trace_rcu_future_grace_period(rdp->rsp->name, rnp->gpnum,
 	//			      rnp->completed, c, rnp->level,
 	//			      rnp->grplo, rnp->grphi, s);
-}
+//}
 
 /*
  * Start some future grace period, as needed to handle newly arrived
