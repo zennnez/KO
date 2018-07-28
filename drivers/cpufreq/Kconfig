@@ -466,8 +466,6 @@ config CPU_FREQ_GOV_IRONACTIVE
 
 	  If in doubt, say N.
 
-<<<<<<< HEAD
-=======
 config CPU_FREQ_GOV_CULTIVATION
 	tristate "'cultivation' cpufreq governor"
 	depends on CPU_FREQ
@@ -485,7 +483,6 @@ config CPU_FREQ_GOV_CAFACTIVE
 
 	  If in doubt, say N.
 
->>>>>>> 7f83bbd... cpufreq: Add Cafactive governor
 config CPU_BOOST
 	tristate "Event base short term CPU freq boost"
 	depends on CPU_FREQ
