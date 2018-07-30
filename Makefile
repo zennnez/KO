@@ -383,7 +383,7 @@ CFLAGS_KERNEL	=
 AFLAGS_KERNEL	=
 CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage -fno-tree-loop-im
 
-OPT_FLAGS	:= -mcpu=kryo -funsafe-math-optimizations -ffast-math \
+OPT_FLAGS	:= -mcpu=cortex-a73.cortex-a53+crypto+crc -funsafe-math-optimizations -ffast-math \
 		   -fvectorize -fslp-vectorize -fopenmp $(POLLY_FLAGS)
 
 # Use USERINCLUDE when you must reference the UAPI directories only.
