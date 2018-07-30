@@ -534,10 +534,10 @@ static int set_cpu_max_freq(const char *buf, const struct kernel_param *kp)
 	/* CPU:value pair */
 	if (!(ntokens % 2))
 		return -EINVAL;
-
+#if 0
 	if (!is_sh(current))
 		return 0;
-
+#endif
 	cp = buf;
 
 	cpumask_clear(limit_mask);
