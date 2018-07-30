@@ -261,7 +261,7 @@ static int ext4_create_inline_data(handle_t *handle,
 	if (error)
 		return error;
 
-	BUFFER_TRACE(is.iloc.bh, "get_write_access");
+	//BUFFER_TRACE(is.iloc.bh, "get_write_access");
 	error = ext4_journal_get_write_access(handle, is.iloc.bh);
 	if (error)
 		goto out;
@@ -347,7 +347,7 @@ static int ext4_update_inline_data(handle_t *handle, struct inode *inode,
 	if (error == -ENODATA)
 		goto out;
 
-	BUFFER_TRACE(is.iloc.bh, "get_write_access");
+	//BUFFER_TRACE(is.iloc.bh, "get_write_access");
 	error = ext4_journal_get_write_access(handle, is.iloc.bh);
 	if (error)
 		goto out;
@@ -424,7 +424,7 @@ static int ext4_destroy_inline_data_nolock(handle_t *handle,
 	if (error)
 		goto out;
 
-	BUFFER_TRACE(is.iloc.bh, "get_write_access");
+	//BUFFER_TRACE(is.iloc.bh, "get_write_access");
 	error = ext4_journal_get_write_access(handle, is.iloc.bh);
 	if (error)
 		goto out;
@@ -509,9 +509,9 @@ int ext4_readpage_inline(struct inode *inode, struct page *page)
 		path = android_fstrace_get_pathname(pathbuf,
 						    MAX_TRACE_PATHBUF_LEN,
 						    inode);
-		trace_android_fs_dataread_start(inode, page_offset(page),
-						PAGE_SIZE, current->pid,
-						path, current->comm);
+		//trace_android_fs_dataread_start(inode, page_offset(page),
+		//				PAGE_SIZE, current->pid,
+		//				path, current->comm);
 	}
 
 	/*
@@ -525,7 +525,7 @@ int ext4_readpage_inline(struct inode *inode, struct page *page)
 		SetPageUptodate(page);
 	}
 
-	trace_android_fs_dataread_end(inode, page_offset(page), PAGE_SIZE);
+	//trace_android_fs_dataread_end(inode, page_offset(page), PAGE_SIZE);
 
 	up_read(&EXT4_I(inode)->xattr_sem);
 
@@ -995,13 +995,13 @@ void ext4_show_inline_dir(struct inode *dir, struct buffer_head *bh,
 	struct ext4_dir_entry_2 *de = inline_start;
 	void *dlimit = inline_start + inline_size;
 
-	trace_printk("inode %lu\n", dir->i_ino);
+	//trace_printk("inode %lu\n", dir->i_ino);
 	offset = 0;
 	while ((void *)de < dlimit) {
 		de_len = ext4_rec_len_from_disk(de->rec_len, inline_size);
-		trace_printk("de: off %u rlen %u name %.*s nlen %u ino %u\n",
-			     offset, de_len, de->name_len, de->name,
-			     de->name_len, le32_to_cpu(de->inode));
+		//trace_printk("de: off %u rlen %u name %.*s nlen %u ino %u\n",
+		//	     offset, de_len, de->name_len, de->name,
+		//	     de->name_len, le32_to_cpu(de->inode));
 		if (ext4_check_dir_entry(dir, NULL, de, bh,
 					 inline_start, inline_size, offset))
 			BUG();
@@ -1034,7 +1034,7 @@ static int ext4_add_dirent_to_inline(handle_t *handle,
 	if (err)
 		return err;
 
-	BUFFER_TRACE(iloc->bh, "get_write_access");
+	//BUFFER_TRACE(iloc->bh, "get_write_access");
 	err = ext4_journal_get_write_access(handle, iloc->bh);
 	if (err)
 		return err;
@@ -1711,7 +1711,7 @@ int ext4_delete_inline_entry(handle_t *handle,
 				EXT4_MIN_INLINE_DATA_SIZE;
 	}
 
-	BUFFER_TRACE(bh, "get_write_access");
+	//BUFFER_TRACE(bh, "get_write_access");
 	err = ext4_journal_get_write_access(handle, bh);
 	if (err)
 		goto out;
@@ -1721,7 +1721,7 @@ int ext4_delete_inline_entry(handle_t *handle,
 	if (err)
 		goto out;
 
-	BUFFER_TRACE(bh, "call ext4_handle_dirty_metadata");
+	//BUFFER_TRACE(bh, "call ext4_handle_dirty_metadata");
 	err = ext4_mark_inode_dirty(handle, dir);
 	if (unlikely(err))
 		goto out;

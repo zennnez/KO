@@ -66,7 +66,7 @@ static struct buffer_head *ext4_append(handle_t *handle,
 		return bh;
 	inode->i_size += inode->i_sb->s_blocksize;
 	EXT4_I(inode)->i_disksize = inode->i_size;
-	BUFFER_TRACE(bh, "get_write_access");
+	//BUFFER_TRACE(bh, "get_write_access");
 	err = ext4_journal_get_write_access(handle, bh);
 	if (err) {
 		brelse(bh);
@@ -782,7 +782,7 @@ dx_probe(struct ext4_filename *fname, struct inode *dir,
 		goto fail;
 	}
 
-	dxtrace(printk("Look up %x", hash));
+	//dxtrace(printk("Look up %x", hash));
 	while (1) {
 		count = dx_get_count(entries);
 		if (!count || count > dx_get_limit(entries)) {
@@ -796,7 +796,7 @@ dx_probe(struct ext4_filename *fname, struct inode *dir,
 		q = entries + count - 1;
 		while (p <= q) {
 			m = p + (q - p) / 2;
-			dxtrace(printk("."));
+			//dxtrace(printk("."));
 			if (dx_get_hash(m) > hash)
 				q = m - 1;
 			else
@@ -808,7 +808,7 @@ dx_probe(struct ext4_filename *fname, struct inode *dir,
 			at = entries;
 			while (n--)
 			{
-				dxtrace(printk(","));
+				//dxtrace(printk(","));
 				if (dx_get_hash(++at) > hash)
 				{
 					at--;
@@ -819,8 +819,8 @@ dx_probe(struct ext4_filename *fname, struct inode *dir,
 		}
 
 		at = p - 1;
-		dxtrace(printk(" %x->%u\n", at == entries ? 0 : dx_get_hash(at),
-			       dx_get_block(at)));
+		//dxtrace(printk(" %x->%u\n", at == entries ? 0 : dx_get_hash(at),
+		//	       dx_get_block(at)));
 		frame->entries = entries;
 		frame->at = at;
 		if (!indirect--)
@@ -953,8 +953,8 @@ static int htree_dirblock_to_tree(struct file *dir_file,
 	int err = 0, count = 0;
 	struct ext4_str fname_crypto_str = {.name = NULL, .len = 0}, tmp_str;
 
-	dxtrace(printk(KERN_INFO "In htree dirblock_to_tree: block %lu\n",
-							(unsigned long)block));
+	//dxtrace(printk(KERN_INFO "In htree dirblock_to_tree: block %lu\n",
+	//						(unsigned long)block));
 	bh = ext4_read_dirblock(dir, block, DIRENT);
 	if (IS_ERR(bh))
 		return PTR_ERR(bh);
@@ -1051,8 +1051,8 @@ int ext4_htree_fill_tree(struct file *dir_file, __u32 start_hash,
 	__u32 hashval;
 	struct ext4_str tmp_str;
 
-	dxtrace(printk(KERN_DEBUG "In htree_fill_tree, start hash: %x:%x\n",
-		       start_hash, start_minor_hash));
+	//dxtrace(printk(KERN_DEBUG "In htree_fill_tree, start hash: %x:%x\n",
+	//	       start_hash, start_minor_hash));
 	dir = file_inode(dir_file);
 	if (!(ext4_test_inode_flag(dir, EXT4_INODE_INDEX))) {
 		hinfo.hash_version = EXT4_SB(dir->i_sb)->s_def_hash_version;
@@ -1132,8 +1132,8 @@ int ext4_htree_fill_tree(struct file *dir_file, __u32 start_hash,
 			break;
 	}
 	dx_release(frames);
-	dxtrace(printk(KERN_DEBUG "Fill tree: returned %d entries, "
-		       "next hash: %x\n", count, *next_hash));
+	//dxtrace(printk(KERN_DEBUG "Fill tree: returned %d entries, "
+	//	       "next hash: %x\n", count, *next_hash));
 	return count;
 errout:
 	dx_release(frames);
@@ -1399,8 +1399,8 @@ static struct buffer_head * ext4_find_entry (struct inode *dir,
 		 */
 		if (!IS_ERR(ret) || PTR_ERR(ret) != ERR_BAD_DX_DIR)
 			goto cleanup_and_exit;
-		dxtrace(printk(KERN_DEBUG "ext4_find_entry: dx failed, "
-			       "falling back\n"));
+		//dxtrace(printk(KERN_DEBUG "ext4_find_entry: dx failed, "
+		//	       "falling back\n"));
 	}
 	nblocks = dir->i_size >> EXT4_BLOCK_SIZE_BITS(sb);
 	if (!nblocks) {
@@ -1522,7 +1522,7 @@ static struct buffer_head * ext4_dx_find_entry(struct inode *dir,
 		block = dx_get_block(frame->at);
 		bh = ext4_read_dirblock(dir, block, DIRENT);
 		if (IS_ERR(bh))
-			goto errout;
+			//goto errout;
 
 		retval = search_dirblock(bh, dir, fname, d_name,
 					 block << EXT4_BLOCK_SIZE_BITS(sb),
@@ -1532,7 +1532,7 @@ static struct buffer_head * ext4_dx_find_entry(struct inode *dir,
 		brelse(bh);
 		if (retval == -1) {
 			bh = ERR_PTR(ERR_BAD_DX_DIR);
-			goto errout;
+			//goto errout;
 		}
 
 		/* Check to see if we should continue to search */
@@ -1543,13 +1543,13 @@ static struct buffer_head * ext4_dx_find_entry(struct inode *dir,
 				"error %d reading directory index block",
 				retval);
 			bh = ERR_PTR(retval);
-			goto errout;
+			//goto errout;
 		}
 	} while (retval == 1);
 
 	bh = NULL;
-errout:
-	dxtrace(printk(KERN_DEBUG "%s not found\n", d_name->name));
+//errout:
+	//dxtrace(printk(KERN_DEBUG "%s not found\n", d_name->name));
 success:
 	dx_release(frames);
 	return bh;
@@ -1727,12 +1727,12 @@ static struct ext4_dir_entry_2 *do_split(handle_t *handle, struct inode *dir,
 		return (struct ext4_dir_entry_2 *) bh2;
 	}
 
-	BUFFER_TRACE(*bh, "get_write_access");
+	//BUFFER_TRACE(*bh, "get_write_access");
 	err = ext4_journal_get_write_access(handle, *bh);
 	if (err)
 		goto journal_error;
 
-	BUFFER_TRACE(frame->bh, "get_write_access");
+	//BUFFER_TRACE(frame->bh, "get_write_access");
 	err = ext4_journal_get_write_access(handle, frame->bh);
 	if (err)
 		goto journal_error;
@@ -1759,9 +1759,9 @@ static struct ext4_dir_entry_2 *do_split(handle_t *handle, struct inode *dir,
 	split = count - move;
 	hash2 = map[split].hash;
 	continued = hash2 == map[split - 1].hash;
-	dxtrace(printk(KERN_INFO "Split block %lu at %x, %i/%i\n",
-			(unsigned long)dx_get_block(frame->at),
-					hash2, split, count-split));
+	//dxtrace(printk(KERN_INFO "Split block %lu at %x, %i/%i\n",
+	//		(unsigned long)dx_get_block(frame->at),
+	//				hash2, split, count-split));
 
 	/* Fancy dance to stay within two buffers */
 	de2 = dx_move_dirents(data1, data2, map + split, count - split,
@@ -1781,10 +1781,10 @@ static struct ext4_dir_entry_2 *do_split(handle_t *handle, struct inode *dir,
 		initialize_dirent_tail(t, blocksize);
 	}
 
-	dxtrace(dx_show_leaf(dir, hinfo, (struct ext4_dir_entry_2 *) data1,
-			blocksize, 1));
-	dxtrace(dx_show_leaf(dir, hinfo, (struct ext4_dir_entry_2 *) data2,
-			blocksize, 1));
+	//dxtrace(dx_show_leaf(dir, hinfo, (struct ext4_dir_entry_2 *) data1,
+	//		blocksize, 1));
+	//dxtrace(dx_show_leaf(dir, hinfo, (struct ext4_dir_entry_2 *) data2,
+	//		blocksize, 1));
 
 	/* Which block gets the new entry? */
 	if (hinfo->hash >= hash2) {
@@ -1799,7 +1799,7 @@ static struct ext4_dir_entry_2 *do_split(handle_t *handle, struct inode *dir,
 	if (err)
 		goto journal_error;
 	brelse(bh2);
-	dxtrace(dx_show_index("frame", frame->entries));
+	//dxtrace(dx_show_index("frame", frame->entries));
 	return de;
 
 journal_error:
@@ -1909,7 +1909,7 @@ static int add_dirent_to_buf(handle_t *handle, struct ext4_filename *fname,
 		if (err)
 			return err;
 	}
-	BUFFER_TRACE(bh, "get_write_access");
+	//BUFFER_TRACE(bh, "get_write_access");
 	err = ext4_journal_get_write_access(handle, bh);
 	if (err) {
 		ext4_std_error(dir->i_sb, err);
@@ -1937,7 +1937,7 @@ static int add_dirent_to_buf(handle_t *handle, struct ext4_filename *fname,
 	ext4_update_dx_flag(dir);
 	dir->i_version++;
 	ext4_mark_inode_dirty(handle, dir);
-	BUFFER_TRACE(bh, "call ext4_handle_dirty_metadata");
+	//BUFFER_TRACE(bh, "call ext4_handle_dirty_metadata");
 	err = ext4_handle_dirty_dirent_node(handle, dir, bh);
 	if (err)
 		ext4_std_error(dir->i_sb, err);
@@ -1970,8 +1970,8 @@ static int make_indexed_dir(handle_t *handle, struct ext4_filename *fname,
 		csum_size = sizeof(struct ext4_dir_entry_tail);
 
 	blocksize =  dir->i_sb->s_blocksize;
-	dxtrace(printk(KERN_DEBUG "Creating index: inode %lu\n", dir->i_ino));
-	BUFFER_TRACE(bh, "get_write_access");
+	//dxtrace(printk(KERN_DEBUG "Creating index: inode %lu\n", dir->i_ino));
+	//BUFFER_TRACE(bh, "get_write_access");
 	retval = ext4_journal_get_write_access(handle, bh);
 	if (retval) {
 		ext4_std_error(dir->i_sb, retval);
@@ -2192,7 +2192,7 @@ static int ext4_dx_add_entry(handle_t *handle, struct ext4_filename *fname,
 		goto cleanup;
 	}
 
-	BUFFER_TRACE(bh, "get_write_access");
+	//BUFFER_TRACE(bh, "get_write_access");
 	err = ext4_journal_get_write_access(handle, bh);
 	if (err)
 		goto journal_error;
@@ -2202,8 +2202,8 @@ static int ext4_dx_add_entry(handle_t *handle, struct ext4_filename *fname,
 		goto cleanup;
 
 	/* Block full, should compress but for now just split */
-	dxtrace(printk(KERN_DEBUG "using %u of %u node entries\n",
-		       dx_get_count(entries), dx_get_limit(entries)));
+	//dxtrace(printk(KERN_DEBUG "using %u of %u node entries\n",
+	//	       dx_get_count(entries), dx_get_limit(entries)));
 	/* Need to split index? */
 	if (dx_get_count(entries) == dx_get_limit(entries)) {
 		ext4_lblk_t newblock;
@@ -2229,17 +2229,17 @@ static int ext4_dx_add_entry(handle_t *handle, struct ext4_filename *fname,
 		memset(&node2->fake, 0, sizeof(struct fake_dirent));
 		node2->fake.rec_len = ext4_rec_len_to_disk(sb->s_blocksize,
 							   sb->s_blocksize);
-		BUFFER_TRACE(frame->bh, "get_write_access");
+		//BUFFER_TRACE(frame->bh, "get_write_access");
 		err = ext4_journal_get_write_access(handle, frame->bh);
 		if (err)
 			goto journal_error;
 		if (levels) {
 			unsigned icount1 = icount/2, icount2 = icount - icount1;
 			unsigned hash2 = dx_get_hash(entries + icount1);
-			dxtrace(printk(KERN_DEBUG "Split index %i/%i\n",
-				       icount1, icount2));
+			//dxtrace(printk(KERN_DEBUG "Split index %i/%i\n",
+			//	       icount1, icount2));
 
-			BUFFER_TRACE(frame->bh, "get_write_access"); /* index root */
+			//BUFFER_TRACE(frame->bh, "get_write_access"); /* index root */
 			err = ext4_journal_get_write_access(handle,
 							     frames[0].bh);
 			if (err)
@@ -2258,16 +2258,16 @@ static int ext4_dx_add_entry(handle_t *handle, struct ext4_filename *fname,
 				swap(frame->bh, bh2);
 			}
 			dx_insert_block(frames + 0, hash2, newblock);
-			dxtrace(dx_show_index("node", frames[1].entries));
-			dxtrace(dx_show_index("node",
-			       ((struct dx_node *) bh2->b_data)->entries));
+			//dxtrace(dx_show_index("node", frames[1].entries));
+			//dxtrace(dx_show_index("node",
+			//       ((struct dx_node *) bh2->b_data)->entries));
 			err = ext4_handle_dirty_dx_node(handle, dir, bh2);
 			if (err)
 				goto journal_error;
 			brelse (bh2);
 		} else {
-			dxtrace(printk(KERN_DEBUG
-				       "Creating second level index...\n"));
+			//dxtrace(printk(KERN_DEBUG
+			//	       "Creating second level index...\n"));
 			memcpy((char *) entries2, (char *) entries,
 			       icount * sizeof(struct dx_entry));
 			dx_set_limit(entries2, dx_node_limit(dir));
@@ -2370,7 +2370,7 @@ static int ext4_delete_entry(handle_t *handle,
 	if (ext4_has_metadata_csum(dir->i_sb))
 		csum_size = sizeof(struct ext4_dir_entry_tail);
 
-	BUFFER_TRACE(bh, "get_write_access");
+	//BUFFER_TRACE(bh, "get_write_access");
 	err = ext4_journal_get_write_access(handle, bh);
 	if (unlikely(err))
 		goto out;
@@ -2381,7 +2381,7 @@ static int ext4_delete_entry(handle_t *handle,
 	if (err)
 		goto out;
 
-	BUFFER_TRACE(bh, "call ext4_handle_dirty_metadata");
+	//BUFFER_TRACE(bh, "call ext4_handle_dirty_metadata");
 	err = ext4_handle_dirty_dirent_node(handle, dir, bh);
 	if (unlikely(err))
 		goto out;
@@ -2610,7 +2610,7 @@ static int ext4_init_new_dir(handle_t *handle, struct inode *dir,
 		initialize_dirent_tail(t, blocksize);
 	}
 
-	BUFFER_TRACE(dir_block, "call ext4_handle_dirty_metadata");
+	//BUFFER_TRACE(dir_block, "call ext4_handle_dirty_metadata");
 	err = ext4_handle_dirty_dirent_node(handle, inode, dir_block);
 	if (err)
 		goto out;
@@ -2787,7 +2787,7 @@ int ext4_orphan_add(handle_t *handle, struct inode *inode)
 	J_ASSERT((S_ISREG(inode->i_mode) || S_ISDIR(inode->i_mode) ||
 		  S_ISLNK(inode->i_mode)) || inode->i_nlink == 0);
 
-	BUFFER_TRACE(sbi->s_sbh, "get_write_access");
+	//BUFFER_TRACE(sbi->s_sbh, "get_write_access");
 	err = ext4_journal_get_write_access(handle, sbi->s_sbh);
 	if (err)
 		goto out;
@@ -2880,7 +2880,7 @@ int ext4_orphan_del(handle_t *handle, struct inode *inode)
 	ino_next = NEXT_ORPHAN(inode);
 	if (prev == &sbi->s_orphan) {
 		jbd_debug(4, "superblock will point to %u\n", ino_next);
-		BUFFER_TRACE(sbi->s_sbh, "get_write_access");
+		//BUFFER_TRACE(sbi->s_sbh, "get_write_access");
 		err = ext4_journal_get_write_access(handle, sbi->s_sbh);
 		if (err) {
 			mutex_unlock(&sbi->s_orphan_lock);
@@ -2999,7 +2999,7 @@ static int ext4_unlink(struct inode *dir, struct dentry *dentry)
 	struct ext4_dir_entry_2 *de;
 	handle_t *handle = NULL;
 
-	trace_ext4_unlink_enter(dir, dentry);
+	//trace_ext4_unlink_enter(dir, dentry);
 	/* Initialize quotas before so that eventual writes go
 	 * in separate transaction */
 	retval = dquot_initialize(dir);
@@ -3054,7 +3054,7 @@ end_unlink:
 	brelse(bh);
 	if (handle)
 		ext4_journal_stop(handle);
-	trace_ext4_unlink_exit(dentry, retval);
+	//trace_ext4_unlink_exit(dentry, retval);
 	return retval;
 }
 
@@ -3322,7 +3322,7 @@ static int ext4_rename_dir_prepare(handle_t *handle, struct ext4_renament *ent)
 		return retval;
 	if (le32_to_cpu(ent->parent_de->inode) != ent->dir->i_ino)
 		return -EFSCORRUPTED;
-	BUFFER_TRACE(ent->dir_bh, "get_write_access");
+	//BUFFER_TRACE(ent->dir_bh, "get_write_access");
 	return ext4_journal_get_write_access(handle, ent->dir_bh);
 }
 
@@ -3332,7 +3332,7 @@ static int ext4_rename_dir_finish(handle_t *handle, struct ext4_renament *ent,
 	int retval;
 
 	ent->parent_de->inode = cpu_to_le32(dir_ino);
-	BUFFER_TRACE(ent->dir_bh, "call ext4_handle_dirty_metadata");
+	//BUFFER_TRACE(ent->dir_bh, "call ext4_handle_dirty_metadata");
 	if (!ent->dir_inlined) {
 		if (is_dx(ent->inode)) {
 			retval = ext4_handle_dirty_dx_node(handle,
@@ -3358,7 +3358,7 @@ static int ext4_setent(handle_t *handle, struct ext4_renament *ent,
 {
 	int retval;
 
-	BUFFER_TRACE(ent->bh, "get write access");
+	//BUFFER_TRACE(ent->bh, "get write access");
 	retval = ext4_journal_get_write_access(handle, ent->bh);
 	if (retval)
 		return retval;
@@ -3369,7 +3369,7 @@ static int ext4_setent(handle_t *handle, struct ext4_renament *ent,
 	ent->dir->i_ctime = ent->dir->i_mtime =
 		ext4_current_time(ent->dir);
 	ext4_mark_inode_dirty(handle, ent->dir);
-	BUFFER_TRACE(ent->bh, "call ext4_handle_dirty_metadata");
+	//BUFFER_TRACE(ent->bh, "call ext4_handle_dirty_metadata");
 	if (!ent->inlined) {
 		retval = ext4_handle_dirty_dirent_node(handle,
 						       ent->dir, ent->bh);
