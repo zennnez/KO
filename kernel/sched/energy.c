@@ -30,7 +30,7 @@
 #include "sched.h"
 
 struct sched_group_energy *sge_array[NR_CPUS][NR_SD_LEVELS];
-bool sched_energy_aware;
+bool sched_energy_aware=true;
 
 static void free_resources(void)
 {

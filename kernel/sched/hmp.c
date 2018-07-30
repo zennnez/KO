@@ -376,7 +376,7 @@ struct sched_cluster init_cluster = {
 	.dstate_wakeup_latency	=	0,
 	.exec_scale_factor	=	1024,
 	.notifier_sent		=	0,
-	.wake_up_idle		=	0,
+	.wake_up_idle		=	1,
 };
 
 static void update_all_clusters_stats(void)
@@ -886,7 +886,7 @@ unsigned int __read_mostly sysctl_sched_big_waker_task_load_pct = 25;
  * cluster migration.
  */
 unsigned int __read_mostly sched_spill_load;
-unsigned int __read_mostly sysctl_sched_spill_load_pct = 100;
+unsigned int __read_mostly sysctl_sched_spill_load_pct = 90;
 
 /*
  * Prefer the waker CPU for sync wakee task, if the CPU has only 1 runnable
@@ -902,7 +902,7 @@ unsigned int __read_mostly sysctl_sched_prefer_sync_wakee_to_waker;
  * capacity.
  */
 unsigned int __read_mostly sched_upmigrate;
-unsigned int __read_mostly sysctl_sched_upmigrate_pct = 80;
+unsigned int __read_mostly sysctl_sched_upmigrate_pct = 95;
 
 /*
  * Big tasks, once migrated, will need to drop their bandwidth
@@ -910,7 +910,7 @@ unsigned int __read_mostly sysctl_sched_upmigrate_pct = 80;
  * migrated.
  */
 unsigned int __read_mostly sched_downmigrate;
-unsigned int __read_mostly sysctl_sched_downmigrate_pct = 60;
+unsigned int __read_mostly sysctl_sched_downmigrate_pct = 80;
 
 /*
  * Task groups whose aggregate demand on a cpu is more than
