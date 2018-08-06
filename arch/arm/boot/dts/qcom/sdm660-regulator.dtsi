@@ -592,7 +592,7 @@
 				qcom,cpr-corner-fmax-map = <1 2 3 4 5 6>;
 
 				qcom,cpr-voltage-ceiling =
-					<505000  565000  725000  645000
+					<505000  565000  645000  645000
 					 790000  845000 990000>;
 				qcom,cpr-voltage-floor =
 					<424000  424000  516000  572000
