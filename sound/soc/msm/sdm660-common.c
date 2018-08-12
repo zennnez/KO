@@ -245,6 +245,7 @@ static struct dev_config mi2s_tx_cfg[] = {
 	[TERT_MI2S] = {SAMPLING_RATE_48KHZ, SNDRV_PCM_FORMAT_S16_LE, 2},
 	/* Huaqin add for config i2s tert dai for nxp pa by xudayi at 2018/03/03 end */
 	[QUAT_MI2S] = {SAMPLING_RATE_48KHZ, SNDRV_PCM_FORMAT_S16_LE, 1},
+#endif
 };
 
 static struct dev_config aux_pcm_rx_cfg[] = {
