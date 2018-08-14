@@ -19,7 +19,6 @@
 #include <linux/input.h>
 #include <linux/moduleparam.h>
 #include <linux/slab.h>
-#include "../../kernel/sched/sched.h"
 
 static unsigned int input_boost_freq_lp = CONFIG_INPUT_BOOST_FREQ_LP;
 static unsigned int input_boost_freq_hp = CONFIG_INPUT_BOOST_FREQ_PERF;
@@ -53,17 +52,10 @@ static struct boost_drv *boost_drv_g;
 
 static u32 get_boost_freq(struct boost_drv *b, u32 cpu)
 {
-	int runnables = 0;
-
 	if (cpumask_test_cpu(cpu, cpu_lp_mask))
 		return input_boost_freq_lp;
 
-	for (cpu; cpu < NR_CPUS; ++cpu) {
-		runnables += cpu_rq(cpu)->nr_running;
-		if (runnables)
- 			return input_boost_freq_hp;
-	}
-	return 0;
+	return input_boost_freq_hp;
 }
 
 static u32 get_boost_state(struct boost_drv *b)
