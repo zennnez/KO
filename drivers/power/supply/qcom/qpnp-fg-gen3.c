@@ -415,6 +415,8 @@ struct battery_name {
 
 #define FG_RATE_LIM_MS (5 * MSEC_PER_SEC)
 
+#define FG_RATE_LIM_MS (5 * MSEC_PER_SEC)
+
 /* All getters HERE */
 
 #define VOLTAGE_15BIT_MASK	GENMASK(14, 0)
@@ -1218,10 +1220,7 @@ static bool usb_psy_initialized(struct fg_chip *chip)
 		return true;
 
 	chip->usb_psy = power_supply_get_by_name("usb");
-	if (!chip->usb_psy)
-		return false;
-
-	return true;
+	return chip->usb_psy;
 }
 
 static bool pc_port_psy_initialized(struct fg_chip *chip)
