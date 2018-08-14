@@ -3805,8 +3805,6 @@ static struct regulator *msm_anlg_cdc_find_regulator(
 			return sdm660_cdc->supplies[i].consumer;
 	}
 
-	dev_err(sdm660_cdc->dev, "Error: regulator not found:%s\n"
-				, name);
 	return NULL;
 }
 
