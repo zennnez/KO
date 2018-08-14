@@ -198,7 +198,8 @@ static int __init vdso_mappings_init(const char *name,
 	pfn = sym_to_pfn(code_start);
 
 	for (i = 0; i < vdso_pages; i++)
-		vdso_pagelist[i + 1] = virt_to_page(&vdso_start + i * PAGE_SIZE);
+		vdso_pagelist[i + 1] = pfn_to_page(pfn + i);
+
 
 	/* Populate the special mapping structures */
 	mappings->data_mapping = (struct vm_special_mapping) {
