@@ -300,5 +300,7 @@
 		/* Huaqin add for ESD check by yuexinghan 20171103 end */
 		qcom,mdss-dsi-pan-enable-dynamic-fps;
 		qcom,mdss-dsi-pan-fps-update = "dfps_immediate_porch_mode_vfp";
+		qcom,partial-update-enabled = "single_roi";
+		qcom,panel-roi-alignment = <2 2 4 2 1080 2>;
 	};
 };
