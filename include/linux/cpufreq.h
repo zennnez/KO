@@ -582,6 +582,9 @@ extern struct cpufreq_governor cpufreq_gov_cafactive;
 #elif defined(CONFIG_CPU_FREQ_DEFAULT_GOV_BIOSHOCK)
 extern struct cpufreq_governor cpufreq_gov_bioshock;
 #define CPUFREQ_DEFAULT_GOVERNOR        (&cpufreq_gov_bioshock)
+#elif defined(CONFIG_CPU_FREQ_DEFAULT_GOV_BARRY_ALLEN)
+extern struct cpufreq_governor cpufreq_gov_barry_allen;
+#define CPUFREQ_DEFAULT_GOVERNOR	(&cpufreq_gov_barry_allen)
 #endif
 
 static inline void cpufreq_policy_apply_limits(struct cpufreq_policy *policy)
