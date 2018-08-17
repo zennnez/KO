@@ -16,6 +16,10 @@ qcom,demo_6000mah {
 	qcom,fastchg-current-ma = <6000>;
 	qcom,batt-id-kohm = <75>;
 	qcom,battery-beta = <3435>;
+	qcom,cold-bat-decidegc = <0>;
+	qcom,cool-bat-decidegc = <150>;
+	qcom,hot-bat-decidegc = <500>;
+        qcom,warm-bat-decidegc = <450>;
 	qcom,battery-type = "Demo_battery_6000mah";
 	qcom,fg-profile-data = [
 		 2C 1F 3F FC
