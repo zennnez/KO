@@ -20,8 +20,10 @@
 #include <linux/moduleparam.h>
 
 static unsigned int devfreq_msm_cpubw_boost_freq = CONFIG_DEVFREQ_MSM_CPUBW_BOOST_FREQ;
+static unsigned int devfreq_msm_cpubw_boost_freq_light = CONFIG_DEVFREQ_MSM_CPUBW_BOOST_FREQ_LIGHT;
 static unsigned short devfreq_boost_duration = CONFIG_DEVFREQ_INPUT_BOOST_DURATION_MS;
 module_param(devfreq_msm_cpubw_boost_freq, uint, 0644);
+module_param(devfreq_msm_cpubw_boost_freq_light, uint, 0644);
 module_param(devfreq_boost_duration, short, 0644);
 
 struct df_boost_drv {
@@ -195,17 +197,27 @@ static void devfreq_input_boost(struct work_struct *work)
 
 	if (!cancel_delayed_work_sync(&b->input_unboost)) {
 		struct devfreq *df = b->df;
-		unsigned long boost_freq, flags;
+		bool boost_light = false;
+		unsigned long boost_freq, boost_freq_light, flags;
 
 		spin_lock_irqsave(&b->lock, flags);
 		boost_freq = b->boost_freq;
+		boost_freq_light = b->boost_freq_light;
 		spin_unlock_irqrestore(&b->lock, flags);
 
 		mutex_lock(&df->lock);
-		if (df->max_freq)
-			df->min_freq = min(boost_freq, df->max_freq);
-		else
-			df->min_freq = boost_freq;
+		boost_light = !load_on_big_cores();
+		if (!boost_light) {
+			if (df->max_freq)
+				df->min_freq = min(boost_freq, df->max_freq);
+			else
+				df->min_freq = boost_freq;
+		} else {
+			if (df->max_freq)
+				df->min_freq = min(boost_freq_light, df->max_freq);
+			else
+				df->min_freq = boost_freq_light;
+		}
 		update_devfreq(df);
 		mutex_unlock(&df->lock);
 	}
@@ -399,6 +411,8 @@ static int __init devfreq_boost_init(void)
 
 	d->devices[DEVFREQ_MSM_CPUBW].boost_freq =
 		devfreq_msm_cpubw_boost_freq;
+	d->devices[DEVFREQ_MSM_CPUBW].boost_freq_light =
+		devfreq_msm_cpubw_boost_freq_light;
 
 	devfreq_boost_input_handler.private = d;
 	ret = input_register_handler(&devfreq_boost_input_handler);
