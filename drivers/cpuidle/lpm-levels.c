@@ -95,16 +95,6 @@ static bool lpm_prediction = true;
 module_param_named(lpm_prediction,
 	lpm_prediction, bool, S_IRUGO | S_IWUSR | S_IWGRP);
 
-static uint32_t ref_stddev = 100;
-module_param_named(
-	ref_stddev, ref_stddev, uint, S_IRUGO | S_IWUSR | S_IWGRP
-);
-
-static uint32_t tmr_add = 100;
-module_param_named(
-	tmr_add, tmr_add, uint, S_IRUGO | S_IWUSR | S_IWGRP
-);
-
 struct lpm_history {
 	uint32_t resi[MAXSAMPLES];
 	int mode[MAXSAMPLES];
@@ -553,6 +543,7 @@ static uint64_t lpm_cpuidle_predict(struct cpuidle_device *dev,
 	int64_t thresh = LLONG_MAX;
 	struct lpm_history *history = &per_cpu(hist, dev->cpu);
 	uint32_t *min_residency = get_per_cpu_min_residency(dev->cpu);
+	uint32_t *max_residency = get_per_cpu_max_residency(dev->cpu);
 
 	if (!lpm_prediction)
 		return 0;
@@ -614,7 +605,7 @@ again:
 	 * ignore one maximum sample and retry
 	 */
 	if (((avg > stddev * 6) && (divisor >= (MAXSAMPLES - 1)))
-					|| stddev <= ref_stddev) {
+					|| stddev <= cpu->ref_stddev) {
 		history->stime = ktime_to_us(ktime_get()) + avg;
 		return avg;
 	} else if (divisor  > (MAXSAMPLES - 1)) {
@@ -639,9 +630,18 @@ again:
 					total += history->resi[i];
 				}
 			}
-			if (failed > (MAXSAMPLES/2)) {
+
+			if (failed >= cpu->ref_premature_cnt) {
 				*idx_restrict = j;
 				do_div(total, failed);
+				for (i = 0; i < j; i++) {
+					if (total < max_residency[i]) {
+						*idx_restrict = i+1;
+						total = max_residency[i];
+						break;
+					}
+				}
+
 				*idx_restrict_time = total;
 				history->stime = ktime_to_us(ktime_get())
 						+ *idx_restrict_time;
@@ -780,8 +780,8 @@ static int cpu_power_select(struct cpuidle_device *dev,
 	if ((predicted || (idx_restrict != (cpu->nlevels + 1)))
 			&& ((best_level >= 0)
 			&& (best_level < (cpu->nlevels-1)))) {
-		htime = predicted + tmr_add;
-		if (htime == tmr_add)
+		htime = predicted + cpu->tmr_add;
+		if (htime == cpu->tmr_add)
 			htime = idx_restrict_time;
 		else if (htime > max_residency[best_level])
 			htime = max_residency[best_level];
@@ -1192,7 +1192,9 @@ static int cluster_configure(struct lpm_cluster *cluster, int idx,
 		struct power_params *pwr_params = &cluster->levels[idx].pwr;
 
 		tick_broadcast_exit();
-		clusttimer_start(cluster, pwr_params->max_residency + tmr_add);
+		clusttimer_start(cluster,
+						 pwr_params->max_residency +
+						 cluster->tmr_add);
 		tick_broadcast_enter();
 	}
 
@@ -1258,7 +1260,8 @@ static void cluster_prepare(struct lpm_cluster *cluster,
 
 			tick_broadcast_exit();
 			clusttimer_start(cluster,
-					pwr_params->max_residency + tmr_add);
+					pwr_params->max_residency +
+							 cluster->tmr_add);
 			tick_broadcast_enter();
 		}
 	}
