@@ -800,13 +800,13 @@ CONFIG_SND_SOC_TFA9874=y
 # Huaqin add for new audioboard bring up by xudayi at 2018/03/03 end
 
 # Huaqin add for ZQL1650-358 by liunianliang at 2018/02/08 start
-CONFIG_PSTORE=y
-CONFIG_PSTORE_CONSOLE=y
-CONFIG_PSTORE_RAM=y
-CONFIG_PSTORE_PMSG=y
-CONFIG_PSTORE_FTRACE=y
-CONFIG_PSTORE_DEBUG_FS=y
-CONFIG_FUNCTION_TRACER=y
+# CONFIG_PSTORE is not set
+# CONFIG_PSTORE_CONSOLE is not set
+# CONFIG_PSTORE_RAM is not set
+# CONFIG_PSTORE_PMSG is not set
+# CONFIG_PSTORE_FTRACE is not set
+# CONFIG_PSTORE_DEBUG_FS is not set
+#CONFIG_FUNCTION_TRACER is not set
 # Huaqin add for ZQL1650-358 by liunianliang at 2018/02/08 end
 
 # KO Additions
