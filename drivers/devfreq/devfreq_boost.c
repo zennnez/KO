@@ -55,7 +55,7 @@ void devfreq_boost_kick(enum df_device device)
 	if (!d)
 		return;
 
-	boost_needed = tasks_on_big_cores();
+	boost_needed = load_on_big_cores();
 
 	if (boost_needed)
 		__devfreq_boost_kick(d->devices + device);
