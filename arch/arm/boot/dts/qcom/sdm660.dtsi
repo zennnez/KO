@@ -153,7 +153,7 @@
 		CPU4: cpu@100 {
 			device_type = "cpu";
 			compatible = "arm,armv8";
-			reg = <0x0 0x100>; 
+			reg = <0x0 0x100>;
 			clock-frequency = <2208000000>;
 			enable-method = "psci";
 			qcom,limits-info = <&mitigation_profile1>;
@@ -427,16 +427,6 @@
 			reg = <0x0 0x9d400000 0x0 0x02400000>;
 			label = "cont_splash_mem";
 		};
-
-		/* Huaqin add for ZQL1650-358 by liunianliang at 2018/02/08 start */
-		pstore_reserve_mem: pstore_reserve_mem_region@0 {
-			linux,reserve-contiguous-region;
-			linux,reserve-region;
-			linux,remove-completely;
-			reg = <0x0 0x9ff00000 0x0 0x00100000>;
-			label = "pstore_reserve_mem";
-		};
-		/* Huaqin add for ZQL1650-358 by liunianliang at 2018/02/08 end */
 	};
 
 	bluetooth: bt_wcn3990 {
