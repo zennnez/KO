@@ -3136,9 +3136,9 @@ static int clk_cpu_osm_driver_probe(struct platform_device *pdev)
 	struct clk_onecell_data *clk_data;
 	char perfclspeedbinstr[] = "qcom,perfcl-speedbin0-v0";
 	char pwrclspeedbinstr[] = "qcom,pwrcl-speedbin0-v0";
-	struct cpu_cycle_counter_cb cb = {
+	/*struct cpu_cycle_counter_cb cb = {
 		.get_cpu_cycle_counter = clk_osm_get_cpu_cycle_counter,
-	};
+	};*/
 
 	/*
 	 * Require the RPM-XO clock and GCC-HMSS-GPLL0 clocks to be registererd

@@ -6135,7 +6135,7 @@ find_idlest_group(struct sched_domain *sd, struct task_struct *p,
  * find_idlest_cpu - find the idlest cpu among the cpus in group.
  */
 static int
-find_idlest_cpu(struct sched_group *group, struct task_struct *p, int this_cpu)
+find_idlest_group_cpu(struct sched_group *group, struct task_struct *p, int this_cpu)
 {
 	unsigned long load, min_load = ULONG_MAX;
 	unsigned int min_exit_latency = UINT_MAX;
@@ -6903,7 +6903,7 @@ select_task_rq_fair(struct task_struct *p, int prev_cpu, int sd_flag, int wake_f
 				continue;
 			}
 
-			new_cpu = find_idlest_cpu(group, p, cpu);
+			new_cpu = find_idlest_cpu(sd, p, cpu, prev_cpu, sd_flag);
 			if (new_cpu == -1 || new_cpu == cpu) {
 				/* Now try balancing at a lower domain level of cpu */
 				sd = sd->child;
