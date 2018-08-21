@@ -5654,7 +5654,7 @@ static int find_new_capacity(struct energy_env *eenv, int cpu_idx)
 
 	return eenv->cpu[cpu_idx].cap_idx;
 }
-
+}
 static int group_idle_state(struct energy_env *eenv, int cpu_idx)
 {
 	struct sched_group *sg = eenv->sg;

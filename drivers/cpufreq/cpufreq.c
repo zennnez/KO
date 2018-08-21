@@ -1127,6 +1127,7 @@ static int cpufreq_init_policy(struct cpufreq_policy *policy)
 	else
 		gov = CPUFREQ_DEFAULT_GOVERNOR;
 
+
 	new_policy.governor = gov;
 
 	/* Use the default policy if there is no last_policy. */

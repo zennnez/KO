@@ -3417,7 +3417,7 @@ static int clk_cpu_osm_driver_probe(struct platform_device *pdev)
 
 	of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
 
-	register_cpu_cycle_counter_cb(&cb);
+	//register_cpu_cycle_counter_cb(&cb);
 
 	pr_info("OSM driver inited\n");
 	put_online_cpus();
