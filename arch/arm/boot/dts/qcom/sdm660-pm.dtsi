@@ -57,6 +57,8 @@
 			qcom,spm-device-names = "cci";
 			qcom,psci-mode-shift = <8>;
 			qcom,psci-mode-mask = <0xf>;
+			qcom,clstr-tmr-add = <1000>;
+
 
 			qcom,pm-cluster-level@0{
 				reg = <0>;
@@ -139,6 +141,9 @@
 					#size-cells = <0>;
 					qcom,psci-mode-shift = <0>;
 					qcom,psci-mode-mask = <0xf>;
+					qcom,ref-stddev = <500>;
+					qcom,tmr-add = <1000>;
+					qcom,ref-premature-cnt = <1>;
 
 					qcom,pm-cpu-level@0 { /* C1 */
 						reg = <0>;
@@ -182,6 +187,9 @@
 				qcom,cpu = <&CPU4 &CPU5 &CPU6 &CPU7>;
 				qcom,psci-mode-shift = <4>;
 				qcom,psci-mode-mask = <0xf>;
+				qcom,ref-stddev = <100>;
+				qcom,tmr-add = <100>;
+				qcom,ref-premature-cnt = <3>;
 
 				qcom,pm-cluster-level@0{  /* D1 */
 					reg = <0>;
