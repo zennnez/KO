@@ -1469,8 +1469,9 @@ populate_dot11f_qos_caps_station(tpAniSirGlobal pMac, tpPESession pe_session,
 
 	if (wlan_cfg_get_int(pMac, WNI_CFG_MAX_SP_LENGTH, &val) != eSIR_SUCCESS)
 		pe_err("could not retrieve Max SP Length");
-
+	{
 		pDot11f->more_data_ack = 0;
+	}
 	pDot11f->max_sp_length = (uint8_t) val;
 	pDot11f->qack = 0;
 
@@ -1969,8 +1970,9 @@ void populate_dot11f_wmm_info_station_per_session(tpAniSirGlobal pMac,
 
 	if (wlan_cfg_get_int(pMac, WNI_CFG_MAX_SP_LENGTH, &val) != eSIR_SUCCESS)
 		pe_err("could not retrieve Max SP Length");
-
+	{
 		pInfo->max_sp_length = (uint8_t) val;
+	}
 	pInfo->present = 1;
 }
 
