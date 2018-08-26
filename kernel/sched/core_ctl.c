@@ -623,7 +623,7 @@ static int core_ctl_set_busy(unsigned int cpu, unsigned int busy)
 {
 	struct cpu_data *c = &per_cpu(cpu_state, cpu);
 	struct cluster_data *cluster = c->cluster;
-	unsigned int old_is_busy = c->is_busy;
+	//unsigned int old_is_busy = c->is_busy;
 
 	if (!cluster || !cluster->inited)
 		return 0;

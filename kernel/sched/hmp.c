@@ -1943,7 +1943,7 @@ static u32 get_pred_busy(struct rq *rq, struct task_struct *p,
 	u8 *buckets = p->ravg.busy_buckets;
 	u32 *hist = p->ravg.sum_history;
 	u32 dmin, dmax;
-	u64 cur_freq_runtime = 0;
+	//u64 cur_freq_runtime = 0;
 	int first = NUM_BUSY_BUCKETS, final;
 	u32 ret = runtime;
 
@@ -3043,7 +3043,7 @@ void reset_all_window_stats(u64 window_start, unsigned int window_size)
 {
 	int cpu, i;
 	unsigned long flags;
-	u64 start_ts = sched_ktime_clock();
+	//u64 start_ts = sched_ktime_clock();
 	int reason = WINDOW_CHANGE;
 	unsigned int old = 0, new = 0;
 

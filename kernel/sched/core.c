@@ -6112,7 +6112,7 @@ int sched_unisolate_cpu_unlocked(int cpu)
 {
 	int ret_code = 0;
 	struct rq *rq = cpu_rq(cpu);
-	u64 start_time = 0;
+	//u64 start_time = 0;
 
 	//if (trace_sched_isolate_enabled())
 	//	start_time = sched_clock();
