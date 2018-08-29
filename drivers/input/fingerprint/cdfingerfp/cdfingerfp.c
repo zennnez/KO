@@ -330,12 +330,6 @@ static void cdfinger_async_report(void)
 
 static irqreturn_t cdfinger_eint_handler(int irq, void *dev_id)
 {
-/* Huaqin modify for cpu_boost by leiyu at 2018/04/25 start */
-	if(screen_status == 0)
-	{
-		sched_set_boost(1);
-	}
-/* Huaqin modify for cpu_boost by leiyu at 2018/04/25 end */
 	cdfinger_async_report();
 	return IRQ_HANDLED;
 }
@@ -524,9 +518,6 @@ static int cdfinger_fb_notifier_callback(struct notifier_block* self,
 		if (isInKeyMode == 0)
 			cdfinger_async_report();
 		mutex_unlock(&g_cdfingerfp_data->buf_lock);
-/* Huaqin modify for cpu_boost by leiyu at 2018/04/25 start */
-		sched_set_boost(0);
-/* Huaqin modify for cpu_boost by leiyu at 2018/04/25 end */
 		printk("sunlin==FB_BLANK_UNBLANK==\n");
             break;
         case FB_BLANK_POWERDOWN:
