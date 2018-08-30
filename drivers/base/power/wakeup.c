@@ -54,6 +54,40 @@ static bool enable_timerfd_ws = true;
 module_param(enable_timerfd_ws, bool, 0644);
 static bool enable_netlink_ws = true;
 module_param(enable_netlink_ws, bool, 0644);
+static bool enable_wlan_ws = true;
+module_param(enable_wlan_ws, bool, 0644);
+static bool enable_wlan_wow_wl_ws = true;
+module_param(enable_wlan_wow_wl_ws, bool, 0644);
+static bool enable_netmgr_wl_ws = true;
+module_param(enable_netmgr_wl_ws, bool, 0644);
+static bool enable_wlan_ipa_ws = true;
+module_param(enable_wlan_ipa_ws, bool, 0644);
+static bool enable_wlan_pno_wl_ws = true;
+module_param(enable_wlan_pno_wl_ws, bool, 0644);
+static bool enable_wcnss_filter_lock_ws = true;
+module_param(enable_wcnss_filter_lock_ws, bool, 0644);
+static bool enable_ipc00000129_2531_Loc_hal_ws = true;
+module_param(enable_ipc00000129_2531_Loc_hal_ws, bool, 0644);
+static bool enable_qbt_wake_source_ws = true;
+module_param(enable_qbt_wake_source_ws, bool, 0644);
+static bool enable_wlan_extscan_wl_ws = true;
+module_param(enable_wlan_extscan_wl_ws, bool, 0644);
+static bool enable_ipc000000ec_system_server_ws = true;
+module_param(enable_ipc000000ec_system_server_ws, bool, 0644);
+static bool enable_dsps_IPCRTR_ws = true;
+module_param(enable_dsps_IPCRTR_ws, bool, 0644);
+static bool enable_wlan_txfl_wake_ws = true;
+module_param(enable_wlan_txfl_wake_ws, bool, 0644);
+static bool enable_bluetooth_timer_ws = true;
+module_param(enable_bluetooth_timer_ws, bool, 0644);
+static bool enable_BT_bt_wake_ws = true;
+module_param(enable_BT_bt_wake_ws, bool, 0644);
+static bool enable_BT_host_wake_ws = true;
+module_param(enable_BT_host_wake_ws, bool, 0644);
+static bool enable_mmc0_detect_ws = true;
+module_param(enable_mmc0_detect_ws, bool, 0644);
+static bool enable_cdfinger_wakelock_ws = true;
+module_param(enable_cdfinger_wakelock_ws, bool, 0644);
 
 /*
  * If set, the suspend/hibernate code will abort transitions to a sleep state
@@ -613,7 +647,41 @@ static bool wakeup_source_blocker(struct wakeup_source *ws)
 			(!enable_timerfd_ws &&
 				!strncmp(ws->name, "[timerfd]", wslen)) ||
 			(!enable_netlink_ws &&
-				!strncmp(ws->name, "netlink", wslen))) {
+				!strncmp(ws->name, "netlink", wslen)) ||
+			(!enable_wlan_ws &&
+				!strncmp(ws->name, "wlan", wslen)) ||
+			(!enable_wlan_wow_wl_ws &&
+				!strncmp(ws->name, "wlan_wow_wl", wslen)) ||
+			(!enable_netmgr_wl_ws &&
+				!strncmp(ws->name, "netmgr_wl", wslen)) ||
+			(!enable_wlan_ipa_ws &&
+				!strncmp(ws->name, "wlan_ipa", wslen)) ||
+			(!enable_wlan_pno_wl_ws &&
+				!strncmp(ws->name, "wlan_pno_wl", wslen)) ||
+			(!enable_wcnss_filter_lock_ws &&
+				!strncmp(ws->name, "wcnss_filter_lock", wslen)) ||
+			(!enable_ipc00000129_2531_Loc_hal_ws &&
+				!strncmp(ws->name, "ipc00000129_2531_Loc_hal", wslen)) ||
+			(!enable_qbt_wake_source_ws &&
+				!strncmp(ws->name, "qbt_wake_source", wslen)) ||
+			(!enable_wlan_extscan_wl_ws &&
+				!strncmp(ws->name, "wlan_extscan_wl", wslen)) ||
+			(!enable_ipc000000ec_system_server_ws &&
+				!strncmp(ws->name, "ipc000000ec_system_server", wslen)) ||
+			(!enable_dsps_IPCRTR_ws &&
+				!strncmp(ws->name, "dsps_IPCRTR", wslen)) ||
+			(!enable_wlan_txfl_wake_ws &&
+				!strncmp(ws->name, "wlan_txfl_wake", wslen)) ||
+			(!enable_bluetooth_timer_ws &&
+				!strncmp(ws->name, "bluetooth_timer", wslen)) ||
+			(!enable_BT_bt_wake_ws &&
+				!strncmp(ws->name, "BT_bt_wake", wslen)) ||
+			(!enable_BT_host_wake_ws &&
+				!strncmp(ws->name, "BT_host_wake", wslen)) ||
+			(!enable_cdfinger_wakelock_ws &&
+				!strncmp(ws->name, "cdfinger wakelock", wslen)) ||
+			(!enable_mmc0_detect_ws &&
+				!strncmp(ws->name, "mmc0_detect", wslen))) {
 			if (ws->active) {
 				wakeup_source_deactivate(ws);
 				pr_info("forcefully deactivate wakeup source: %s\n",
