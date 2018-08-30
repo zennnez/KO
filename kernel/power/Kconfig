@@ -335,7 +335,7 @@ config CPU_PM
 config	BOEFFLA_WL_BLOCKER
 		bool "Boeffla generic wakelock blocker driver"
 		depends on PM
-		default y
+		default Y
 
 config QUICK_WAKEUP
 	bool "Quick wakeup"
