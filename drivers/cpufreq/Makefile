@@ -17,7 +17,6 @@ obj-$(CONFIG_CPU_FREQ_GOV_IMPULSE)	+= cpufreq_impulse.o
 obj-$(CONFIG_CPU_FREQ_GOV_CULTIVATION)	+= cpufreq_cultivation.o
 obj-$(CONFIG_CPU_FREQ_GOV_COMMON)		+= cpufreq_governor.o
 obj-$(CONFIG_CPU_FREQ_GOV_TRIPNDROID)	+= cpufreq_tripndroid.o
-obj-$(CONFIG_CPU_FREQ_GOV_COMMON)	+= cpufreq_governor.o
 obj-$(CONFIG_CPU_FREQ_GOV_NIGHTMARE)	+= cpufreq_nightmare.o
 obj-$(CONFIG_CPU_FREQ_GOV_DARKNESS)	+= cpufreq_darkness.o
 obj-$(CONFIG_CPU_FREQ_GOV_ALUCARD)	+= cpufreq_alucard.o
@@ -26,6 +25,24 @@ obj-$(CONFIG_CPU_FREQ_GOV_CHILL)        += cpufreq_chill.o
 obj-$(CONFIG_CPU_FREQ_GOV_CAFACTIVE)	+= cpufreq_cafactive.o
 obj-$(CONFIG_CPU_FREQ_GOV_BIOSHOCK)		+= cpufreq_bioshock.o
 obj-$(CONFIG_CPU_FREQ_GOV_BARRY_ALLEN)		+= cpufreq_barry_allen.o
+obj-$(CONFIG_CPU_FREQ_GOV_DARKNESSV5)   += cpufreq_darknessv5.o
+obj-$(CONFIG_CPU_FREQ_GOV_HYPER)	+= cpufreq_HYPER.o
+obj-$(CONFIG_CPU_FREQ_GOV_BARRY_ALLEN)	+= cpufreq_barry_allen.o
+obj-$(CONFIG_CPU_FREQ_GOV_LIONHEARTH)	+= cpufreq_lionheart.o
+obj-$(CONFIG_CPU_FREQ_GOV_INTERACTIVEX)	+= cpufreq_interactivex.o
+CFLAGS_cpufreq_interactivex.o += -Wno-unused-function
+obj-$(CONFIG_CPU_FREQ_GOV_ELECTRODEMAND)	+= cpufreq_electrodemand.o
+obj-$(CONFIG_CPU_FREQ_GOV_INTERACTIVE_PRO)	+= cpufreq_interactive_pro.o
+obj-$(CONFIG_CPU_FREQ_GOV_INTELLIACTIVE)	+= cpufreq_intelliactive.o
+obj-$(CONFIG_CPU_FREQ_GOV_INTELLIDEMAND)	+= cpufreq_intellidemand.o
+CFLAGS_cpufreq_intellidemand.o += -Wno-unused-variable
+obj-$(CONFIG_CPU_FREQ_GOV_DANCEDANCE)	+= cpufreq_dancedance.o
+obj-$(CONFIG_CPU_FREQ_GOV_PEGASUSQ)	+= cpufreq_pegasusq.o
+obj-$(CONFIG_CPU_FREQ_GOV_COMMON)	+= cpufreq_governor.o
+obj-$(CONFIG_CPU_FREQ_GOV_ELECTRON_ADVANCE)	+= cpufreq_electron_advance.o
+obj-$(CONFIG_CPU_FREQ_GOV_INTERACTIVE_PRO) += cpufreq_interactive_pro.o
+obj-$(CONFIG_CPU_FREQ_GOV_ALESSA) 		+= cpufreq_alessa.o
+
 obj-$(CONFIG_CPU_BOOST)			+= cpu-boost.o
 
 # CPU wake boost
