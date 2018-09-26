@@ -415,8 +415,6 @@ struct battery_name {
 
 #define FG_RATE_LIM_MS (5 * MSEC_PER_SEC)
 
-#define FG_RATE_LIM_MS (5 * MSEC_PER_SEC)
-
 /* All getters HERE */
 
 #define VOLTAGE_15BIT_MASK	GENMASK(14, 0)
