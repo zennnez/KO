@@ -1435,7 +1435,7 @@ static ssize_t show_screen_off_maxfreq(
  	ret = kstrtoul(buf, 0, &val);
 	if (ret < 0)
 		return ret;
- 	if (val < 384000)
+ 	if (val < 300000)
 		tunables->screen_off_max = DEFAULT_SCREEN_OFF_MAX;
 	else
 		tunables->screen_off_max = val;
