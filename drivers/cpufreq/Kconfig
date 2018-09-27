@@ -416,6 +416,14 @@ config CPU_FREQ_GOV_ONDEMAND
 
 	  If in doubt, say N.
 
+config CPU_FREQ_GOV_CLARITY
+	bool "'clarity' cpufreq policy governor"
+	help
+	  'clarity' - This driver adds a dynamic cpufreq policy governor
+	  designed for latency-sensitive workloads.
+
+	  If in doubt, say N.
+
 config CPU_FREQ_GOV_REBIRTHX
 	bool "'rebirthx' cpufreq policy governor"
 	help
