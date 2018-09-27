@@ -329,15 +329,6 @@ config CPU_FREQ_DEFAULT_GOV_BIOSHOCK
  	help
  	  Default governor of BioShock kernel
 
-config CPU_FREQ_DEFAULT_GOV_BARRY_ALLEN
- 	bool "barry_allen"
- 	select CPU_FREQ_GOV_BARRY_ALLEN
- 	help
- 	  Use the CPUFreq governor 'barry_allen' as default. This allows
- 	  you to get a full dynamic cpu frequency capable system by simply
- 	  loading your cpufreq low-level hardware driver, using the
- 	  'barry_allen' governor for latency-sensitive workloads.
-
 endchoice
 
 config CPU_FREQ_GOV_PERFORMANCE
@@ -485,19 +476,6 @@ config CPU_FREQ_GOV_BIOSHOCK
  	help
  	  'bioshock' - More aggressive version of conservative
 
-config CPU_FREQ_GOV_BARRY_ALLEN
- 	tristate "'barry_allen' cpufreq policy governor"
- 	help
- 	  'barry_allen' - This driver adds a dynamic cpufreq policy governor
- 	  designed for latency-sensitive workloads.
-  	  This governor attempts to reduce the latency of clock
- 	  increases so that the system is more responsive to
- 	  barry_allen workloads.
-  	  To compile this driver as a module, choose M here: the
- 	  module will be called cpufreq_barry_allen.
-  	  For details, take a look at linux/Documentation/cpu-freq.
-  	  If in doubt, say N.
-
 config CPU_FREQ_GOV_CONSERVATIVE
 	tristate "'conservative' cpufreq governor"
 	depends on CPU_FREQ
@@ -522,11 +500,7 @@ config CPU_FREQ_GOV_CONSERVATIVE
 
 	  If in doubt, say N.
 
-config CPU_FREQ_GOV_ELECTRODEMAND
-	tristate "'electrodemand' cpufreq governor"
-	depends on CPU_FREQ
-	
- config CPU_FREQ_GOV_ONDEMANDPLUS
+config CPU_FREQ_GOV_ONDEMANDPLUS
 	tristate "'ondemandplus' cpufreq governor"
 	depends on CPU_FREQ
 	
